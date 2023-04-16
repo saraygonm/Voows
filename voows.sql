@@ -124,7 +124,7 @@ CREATE TABLE Intercambio(
     numero_intercabios NUMBER(10),
     fechaCreacion DATE,
     fechaEntrega DATE,
-    calificaion NUMBER(1)
+    calificacion NUMBER(1)
 );
 
 CREATE TABLE Notificacion(
@@ -167,8 +167,9 @@ ALTER TABLE Libro ADD CONSTRAINT CK_Libro_ISBN CHECK (ISBN >=0);
 ALTER TABLE Libro ADD CONSTRAINT CK_Libro_estado CHECK (estado = 'A' OR estado = 'C' );
 
 ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_codigo CHECK (codigo >= 0); /*consecutivo?*/
-ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_tipo CHECK (tipo like'%jpg' OR tipo like '%gif' OR tipo like '%bmp' OR tipo like '%png'  )
-ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_TURL CHECK(url like '%https://%' and url like '%pdf');
+ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_tipo CHECK (tipo = '%jpg' OR tipo ='%gif' OR tipo='%bmp' OR tipo = '%png')
+ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_TURL CHECK(URL like '%https://%' and URL like '%pdf');
+
 
 ALTER TABLE Categoria ADD CONSTRAINT CK_Categoria_nombre CHECK(nombre = 'A' OR nombre = 'M' OR nombre = 'C' OR nombre ='D'
 OR nombre = 'E' OR nombre = 'F' OR nombre ='TE' OR nombre ='RE' OR nombre ='T' OR nombre ='F' OR nombre ='R' OR nombre ='M'
@@ -191,10 +192,10 @@ ALTER TABLE Grupo ADD CONSTRAINT CK_Grupo_estado CHECK (estado = 'A' OR estado =
 ALTER TABLE Chat ADD CONSTRAINT CK_Chat_id CHECK (id_chat >= 1000);
 
 ALTER TABLE Intercambio ADD CONSTRAINT CK_Intercambio_id CHECK (id_inter >= 0 );
-ALTER TABLE Intercambio ADD CONSTRAINT CK_Intercambio_califica CHECK(calificacion >=1 AND calificacion<=5);
+ALTER TABLE Intercambio ADD CONSTRAINT CK_Intercambio_califica CHECK(calificacion >=1 AND calificacion <=5);
 
 ALTER TABLE Notificacion ADD CONSTRAINT CK_Notificacion_codigo CHECK (codigo_noti >=0); /*consecutivo?*/
-ALTER TABLE Notificacion ADD CONSTRAINT CK_Notificacion_estado CHECK (estado = 'Solicitado' OR estado = 'En proceso' OR estado ='Entregado' OR estado = 'Cancelado');
+ALTER TABLE Notificacion ADD CONSTRAINT CK_Notificacion_estado CHECK (estado = 'Solicitado' OR estado = 'En proceso' OR estado ='Entregado' OR estado = 'Cancelado' OR estado= 'Oculto');
 
 
 
@@ -245,10 +246,91 @@ ALTER TABLE UsuarioXgrupo ADD CONSTRAINT FK_UsuarioXgrupo_idu FOREIGN KEY (id_us
 ALTER TABLE Chat ADD CONSTRAINT FK_Chat FOREIGN KEY (nombre_grupo) REFERENCES Grupo(nombre);
 
 ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_chat FOREIGN KEY (id_chat) REFERENCES Chat(id_chat);
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN FOREIGN KEY (libro_inter1, libro_inter2) REFERENCES Libro(ISBN);
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_idu FOREIGN KEY (usuario1, usuario2) REFERENCES Usuario(idu);
-
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN1 FOREIGN KEY (libro_inter1), usuario1 REFERENCES Libro(ISBN, id_usuario);
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN2 FOREIGN KEY (libro_inter2, usuario2) REFERENCES Libro(ISBN, id_usuario);
 ALTER TABLE Notificacion ADD CONSTRAINT FK_Notificacion FOREIGN KEY (id_inter) REFERENCES Intercambio(id_inter);
+
+
+/*Ad*/
+
+/* el estado inicial de una notificacion es oculto*/
+CREATE OR REPLACE TRIGGER TR_Estado_inicial
+BEFORE INSERT ON Intercambio
+FOR EACH ROW
+BEGIN
+    :NEW.estado := 'Oculto';
+END;
+
+/*los libros incluídos deben pertenecer al usuario*/
+
+/*los Libros solicitados deben estar disponibles*/
+CREATE OR REPLACE TRIGGER TR_Libro_dip
+BEFORE INSERT ON Intercambio
+FOR EACH ROW
+DECLARE
+    disp VARCHAR2;   
+BEGIN 
+    SELECT estado INTO disp FROM Libro AS lib
+    JOIN Notificacion AS noti ON Lib.codigo_noti = noti.codigo_noti
+    JOIN Intercambio AS Inter ON Lib.id.inter = inter.id.inter
+    WHERE numero = :NEW.numero AND estado = 'true';
+    IF disp != 'true' THEN
+        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE');
+    END IF;
+END;*/
+
+/*Mo*/
+
+/*El estado se puede modificar de oculta a abierta y de abierta a cancelada*/
+CREATE OR REPLACE TRIGGER TR_ModificarEstado
+BEFORE UPDATE ON Intercambio
+FOR EACH ROW
+BEGIN 
+    IF :OLD.estado = 'O' AND :NEW.estado != 'A' THEN
+        RAISE_APPLICATION_ERROR(-20003,'Solo se puede pasar a estado abierto');
+    ELSIF :OLD.estado = 'A' AND :NEW.estado != 'C' THEN
+        RAISE_APPLICATION_ERROR(-20003,'Solo se puede pasar a estado oculto');
+    END IF;
+END;
+
+/* Sólo se pueden modificar todos los datos de intercambio si la notificacion está en estado oculta*/
+CREATE OR REPLACE TRIGGER TR_ModificarEstadoOculta
+BEFORE UPDATE ON Intercambio
+FOR EACH ROW
+DECLARE
+    estado_actual CHAR(1);
+BEGIN
+    SELECT estado INTO estado_actual FROM Notificacion WHERE :OLD.numero = :NEW.numero;
+    IF estado_actual != 'O' AND :NEW.estado != 'A'THEN
+        RAISE_APPLICATION_ERROR(-20003,'Solo se puede modificar si el estado es oculto');
+    END IF;
+END IF;
+
+/*El*/
+   /*-Solo se puede eliminar los intercambios con notificaciones ocultos*/
+
+ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_chat;
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_chat FOREIGN KEY (id_chat) 
+REFERENCES Chat(id_chat)ON DELETE CASCADE;
+
+ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_ISBN;
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN FOREIGN KEY (libro_inter1, usuario1) 
+REFERENCES Libro(ISBN, id_usuario) ON DELETE CASCADE;
+
+ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_idu;
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_idu FOREIGN KEY (libro_inter2, usuario2) 
+REFERENCES Libro(ISBN, id_usuario)ON DELETE CASCADE;
+
+
+create or replace TRIGGER TR_Eliminar_inter
+BEFORE DELETE ON Notificacion
+FOR EACH ROW
+BEGIN
+    IF :OLD.estado != 'O' THEN
+        RAISE_APPLICATION_ERROR(-20003,'No esta en estado oculto');
+    END IF;
+END;
+
 
 
 
