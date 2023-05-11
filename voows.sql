@@ -135,15 +135,15 @@ DROP TABLE UsuarioXgrupo;
 DROP TABLE Notificacion;
 DROP TABLE Intercambio;
 DROP TABLE Chat;
+DROP TABLE Planes;
+DROP TAblE Free;
+DROP TABLE Grupo;
 DROP TABLE Libro;
 DROP TABLE Localizacion;
-DROP TABLE Grupo;
 DROP TABLE Genero;
 DROP TABLE Usuario;
 DROP TABLE Publicidad;
 DROP TABLE Plus;
-DROP TAblE Free;
-DROP TABLE Planes;
 
 
 /*Los usuarios en la tabla de intercambios deben ser diferentes*/
