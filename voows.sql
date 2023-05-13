@@ -442,6 +442,72 @@ BEGIN
 END;
 /
 
+/*VISTAS*/
+--Vista de usuarios con planes Plus
+CREATE VIEW usuarios_plus AS
+SELECT u.idu, u.nombre, p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
+FROM Usuario u
+INNER JOIN Planes p ON u.id_pluss = p.idp
+INNER JOIN Plus pl ON p.idp = pl.idp_plan;
+
+--Vista de usuarios con planes Free
+CREATE VIEW usuarios_free AS
+SELECT u.idu, u.nombre, p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
+FROM Usuario u
+INNER JOIN Planes p ON u.id_free = p.idp
+INNER JOIN Free f ON p.idp = f.idp_plan;
+
+--Vista de libros con su localizacion
+CREATE VIEW libros_localizacion AS
+SELECT l.ISBN, l.titulo, l.autor, l.sinopsis, l.editorial, loc.id_localizacion, loc.latitud, loc.longitud
+FROM Libro l
+LEFT JOIN Localizacion loc ON l.id_usuario = loc.id_localizacion;
+
+--Vistas de eventos con su localizacion
+CREATE VIEW eventos_localizacion AS
+SELECT e.id_evento, e.id_grupo, e.nombre, e.proposito, e.fecha_inicio, e.fecha_finalizacion, loc.id_localizacion, loc.latitud, loc.longitud
+FROM Evento e
+LEFT JOIN Localizacion loc ON e.id_localizacion = loc.id_localizacion;
+
+
+--Vista de intercambios de libros con informacion de los usuarios
+CREATE VIEW intercambios_usuarios AS
+SELECT i.id_inter, i.id_chat, i.libro_inter1, u1.nombre AS nombre_usuario1, i.libro_inter2, u2.nombre AS nombre_usuario2, i.fechaCreacion, i.fechaEntrega, i.calificacion, i.estado
+FROM Intercambio i
+INNER JOIN Usuario u1 ON i.usuario1 = u1.idu
+INNER JOIN Usuario u2 ON i.usuario2 = u2.idu;
+
+
+--Vista de eventos activos
+CREATE VIEW eventos_activos AS
+SELECT id_evento, nombre, fecha_inicio, fecha_finalizacion
+FROM Evento
+WHERE fecha_finalizacion >= SYSDATE;
+
+--Vista de intercambios pendientes
+CREATE VIEW intercambios_pendientes AS
+SELECT id_inter, id_chat, usuario1, usuario2, fechaCreacion, fechaEntrega
+FROM Intercambio
+WHERE estado = 'Pendiente';
+
+--Vista que muestra los libros disponibles para intercambio en un evento
+CREATE VIEW libros_disponibles AS
+SELECT l.ISBN, l.titulo, l.autor, l.sinopsis, l.editorial, e.nombre as evento
+FROM Libro l
+INNER JOIN Intercambio i ON l.id_usuario = i.usuario1
+INNER JOIN Evento e ON i.id_chat = e.id_chat
+WHERE l.estado = 'disponible' AND i.estado = 'activo'
+
+
+/*XIndicesVistas*/
+DROP VIEW usuarios_plus;
+DROP VIEW usuarios_free;
+DROP VIEW libros_localizacion;
+DROP VIEW eventos_localizacion;
+DROP VIEW intercambios_usuarios;
+DROP VIEW eventos_activos;
+DROP VIEW intercambios_pendientes;
+DROP VIEW libros_disponibles;
 
 
 
