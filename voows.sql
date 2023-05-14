@@ -509,6 +509,407 @@ DROP VIEW eventos_activos;
 DROP VIEW intercambios_pendientes;
 DROP VIEW libros_disponibles;
 
+/*CRUDE*/
+--implementacion del paquete correspondiente al CRUD Intercambio
+create or replace PACKAGE PC_Intercambio AS
+PROCEDURE adicionar_Inter(in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_calificacion IN NUMBER, in_estado IN VARCHAR);
+PROCEDURE modificar_Inter(in_id_inter IN NUMBER, in_id_chat IN NUMBER,in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_fechaCreacion IN DATE, in_fechaEntrega IN DATE, in_calificacion IN NUMBER, in_estado IN VARCHAR);
+PROCEDURE eliminar_Inter(in_id_inter IN NUMBER,  in_id_chat IN NUMBER );
+PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR);
+END;
+/
+
+/*CRUDI*/
+CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
+--Procedimiento para adicionar un intercambio
+  PROCEDURE adicionar_Inter(
+    in_libro_inter1 IN NUMBER, 
+    in_usuario1 IN NUMBER, 
+    in_libro_inter2 IN NUMBER, 
+    in_usuario2 IN NUMBER, 
+    in_calificacion IN NUMBER, 
+    in_estado IN VARCHAR
+    ) IS
+  BEGIN
+    INSERT INTO Intercambio VALUES (5467892984,1267489874,1234568901,1235679873,4,in_estado);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+  
+  -- Procedimiento para modificar un intercambio
+  PROCEDURE modificar_Inter(
+    in_id_inter IN NUMBER,
+    in_id_chat IN NUMBER,
+    in_libro_inter1 IN NUMBER,
+    in_usuario1 IN NUMBER,
+    in_libro_inter2 IN NUMBER,
+    in_usuario2 IN NUMBER,
+    in_fechaCreacion IN DATE,
+    in_fechaEntrega IN DATE,
+    in_calificacion IN NUMBER,
+    in_estado IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Intercambio
+    SET
+      id_chat = in_id_chat,
+      libro_inter1 = in_libro_inter1,
+      usuario1 = in_usuario1,
+      libro_inter2 = in_libro_inter2,
+      usuario2 = in_usuario2,
+      fechaCreacion = in_fechaCreacion,
+      fechaEntrega = in_fechaEntrega,
+      calificacion = in_calificacion,
+      estado = in_estado
+    WHERE id_inter = in_id_inter;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+  
+--Procedimiento para eliminar un intercambio
+  PROCEDURE eliminar_Combo(in_id_inter IN NUMBER,  in_id_chat IN NUMBER ) IS
+  BEGIN
+    DELETE FROM Intercambio WHERE id_inter = in_id_inter AND id_chat = in_id_chat;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--Procedimiento para consultar un intercambio
+  PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Intercambio WHERE estado = in_estado;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+
+END PC_Intercambio;
+/
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+/*CRUDE*/
+--implementacion del paquete correspondiente al CRUD Libros
+create or replace PACKAGE PC_Libro AS
+
+PROCEDURE adicionar_Libro(li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
+PROCEDURE modificar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER, li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
+PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER);
+PROCEDURE consulta_Libro_Estado(li_estado IN VARCHAR);
+END;
+/
+
+/*CRUDI*/
+CREATE OR REPLACE PACKAGE BODY PC_Libro AS
+--Procedimiento para adicionar un Libro
+PROCEDURE adicionar_Libro(
+    li_titulo IN VARCHAR,
+    li_autor  IN VARCHAR, 
+    li_sinopsis IN VARCHAR, 
+    li_editorial IN VARCHAR, 
+    li_comentario IN VARCHAR, 
+    li_fecha_impresion IN DATE, 
+    li_estado IN VARCHAR
+    ) IS
+  BEGIN
+    INSERT INTO Libro VALUES (li_titulo,li_autor,li_sinopsis,li_editorial,li_comentario,li_fecha_impresion,li_estado);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+  
+  -- Procedimiento para modificar un Libro
+  PROCEDURE modificar_Libro(
+    li_id_usuario IN NUMBER, 
+    li_ISBN IN NUMBER, 
+    li_titulo IN VARCHAR, 
+    li_autor IN VARCHAR, 
+    li_sinopsis IN VARCHAR, 
+    li_editorial IN VARCHAR, 
+    li_comentario IN VARCHAR, 
+    li_fecha_impresion IN DATE, 
+    li_estado IN VARCHAR
+  ) IS
+  BEGIN
+    UPDATE Libro
+    SET 
+      titulo = li_titulo,
+      autor = li_autor,
+      sinopsis = li_sinopsis,
+      editorial = li_editorial,
+      comentario = li_comentario,
+      fecha_impresion = li_fecha_impresion,
+      estado = li_estado
+    WHERE id_usuario = li_id_usuario AND ISBN = li_ISBN;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--Procedimiento para eliminar un Libro
+  PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER) IS
+  BEGIN
+    DELETE FROM Libro WHERE id_usuario = li_id_usuario AND ISBN = li_ISBN ;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--Procedimiento para consultar un  Libro
+  PROCEDURE consulta_libro_Estado(in_estado IN VARCHAR) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Libro WHERE estado = li_estado;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+
+END PC_Libro;
+/
+
+---------------------------------------------------------------------------------------------------------------------------------------
+
+/*CRUDE*/
+--implementacion del paquete correspondiente al CRUD Eventos
+create or replace PACKAGE PC_Evento AS
+PROCEDURE adicionar_Evento(ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
+PROCEDURE modificar_Evento(ev_id_evento IN NUMBER, ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
+PROCEDURE eliminar_Evento(ev_id_evento IN NUMBER);
+PROCEDURE consulta_Evento_Nombre(ev_nombre IN VARCHAR);
+END;
+/
+
+/*CRUDI*/
+CREATE OR REPLACE PACKAGE BODY PC_Usuario AS
+--Procedimiento para adicionar un Evento
+PROCEDURE adicionar_Evento(
+    ev_id_grupo IN VARCHAR,
+    ev_id_localizacion IN NUMBER, 
+    ev_nombre IN VARCHAR, 
+    ev_proposito IN VARCHAR, 
+    ev_fecha_inicio IN DATE, 
+    ev_fecha_finalizacion IN DATE, 
+    ev_asisten IN VARCHAR, 
+    ev_interesados IN VARCHAR
+    ) IS
+  BEGIN
+    INSERT INTO Evento VALUES (ev_id_grupo,234567,ev_nombre,ev_proposito,ev_fecha_inicio,ev_fecha_finalizacion,ev_asisten, ev_interesados);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+-- Procedimiento para modificar un evento
+  PROCEDURE modificar_Evento(
+    ev_id_evento IN NUMBER, 
+    ev_id_grupo IN VARCHAR,
+    ev_id_localizacion IN NUMBER, 
+    ev_nombre IN VARCHAR, 
+    ev_proposito IN VARCHAR, 
+    ev_fecha_inicio IN DATE, 
+    ev_fecha_finalizacion IN DATE, 
+    ev_asisten IN VARCHAR, 
+    ev_interesados IN VARCHAR
+    ) IS
+  BEGIN
+    UPDATE Evento
+    SET 
+      id_grupo = ev_id_grupo,
+      id_localizacion = ev_id_localizacion,
+      nombre = ev_nombre,
+      proposito = ev_proposito,
+      fecha_inicio = ev_fecha_inicio,
+      fecha_finalizacion = ev_fecha_finalizacion,
+      asisten = ev_asisten,
+      interesados = ev_interesados
+      estado = us_estado
+    WHERE id_evento = ev_id_evento;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;  
+
+--Procedimiento para consultar un Evento
+  PROCEDURE consulta_Evento_Nombre(ev_nombre IN VARCHAR) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Evento WHERE nombre = ev_nombre;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+
+END PC_Evento;
+/   
+
+/*XCRUD*/
+DROP PACKAGE PC_Intercambio;
+DROP PACKAGE PC_Libro;
+DROP PACKAGE PC_Usuario;
+DROP PACKAGE PC_Evento;
+
+/*Falta CRUD OK y CRUDNoOK*/
+
+/*ActoresE*/
+--CREATE ROLE PA_GERENTE;
+CREATE ROLE PA_JUNTAA;
+--CREATE ROLE PA_ORGANIZADOR;
+--CREATE ROLE PA_SERVIDOR;
+CREATE ROLE PA_USUARIOO;
+
+
+/*ActoresI*/
+/
+CREATE OR REPLACE PACKAGE PC_USUARIO AS
+    PROCEDURE adicionar_Usuario(us_id_free IN NUMBER, us_pluss IN NUMBER,us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
+END PC_USUARIO;
+/
+CREATE OR REPLACE PACKAGE PC_USUARIO_JUNTA AS
+    PROCEDURE adicionar_Usuario(us_id_free IN NUMBER, us_pluss IN NUMBER,us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
+    PROCEDURE modificar_Usuario(us_idu IN NUMBER, us_id_free IN NUMBER, us_pluss IN NUMBER, us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
+    PROCEDURE eliminar_Usuario(us_idu IN NUMBER);
+/
+
+--Procedimiento para adicionar un usuario
+PROCEDURE adicionar_Usuario(
+    us_id_free IN NUMBER, 
+    us_pluss IN NUMBER,
+    us_localizacion IN NUMBER, 
+    us_organizador_grupo IN VARCHAR,  
+    us_correo IN VARCHAR, 
+    us_contrasenia IN VARCHAR, 
+    us_fecha_conexion IN DATE, 
+    us_nombre IN VARCHAR, 
+    us_estado IN VARCHAR
+    ) IS
+  BEGIN
+    INSERT INTO Usuario VALUES (123456,23456,456789,us_organizador_grupo, us_correo, us_contrasenia, us_fecha_conexion, us_nombre, us_estado);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+-- Procedimiento para modificar un Usuario
+  PROCEDURE modificar_Usuario(
+    us_idu IN NUMBER,
+    us_id_free IN NUMBER, 
+    us_pluss IN NUMBER, 
+    us_localizacion IN NUMBER, 
+    us_organizador_grupo IN VARCHAR,  
+    us_correo IN VARCHAR, 
+    us_contrasenia IN VARCHAR, 
+    us_fecha_conexion IN DATE, 
+    us_nombre IN VARCHAR, 
+    us_estado IN VARCHAR
+   
+  ) IS
+  BEGIN
+    UPDATE Usuario
+    SET 
+      id_free = us_id_free,
+      id_pluss = us_pluss,
+      id_localizacion = us_localizacion,
+      organizador_grupo = us_organizador_grupo,
+      correo = us_correo,
+      contrasenia = us_contrasenia,
+      fecha_conexion = us_fecha_conexion,
+      nombre = us_nombre,
+      estado = us_estado
+    WHERE idu = us_idu;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--Procedimiento para eliminar un usuario
+  PROCEDURE eliminar_Usuario(us_idu IN NUMBER) IS
+  BEGIN
+    DELETE FROM Usuario WHERE idu = us_idu;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--Procedimiento para consultar un Usuario
+  PROCEDURE consulta_usuario_Estado(in_estado IN VARCHAR) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Usuario WHERE estado = us_estado;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+
+END PC_USUARIO_JUNTA;
+/
+CREATE OR REPLACE PACKAGE BODY PC_USUARIO AS
+    PROCEDURE adicionar_Usuario(us_id_free IN NUMBER, us_pluss IN NUMBER,us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
+        BEGIN
+        INSERT INTO usuario VALUES(123456,23456,456789,us_organizador_grupo, us_correo, us_contrasenia, us_fecha_conexion, us_nombre, us_estado);
+        IF(SQL%ROWCOUNT = 0) THEN
+            RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+        END IF;
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+    END;
+END PC_USUARIO;
+
+
 
 
 
