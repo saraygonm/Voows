@@ -4,9 +4,7 @@
 CREATE TABLE Planes(
     idp NUMBER(6) NOT NULL,
     estado VARCHAR2(5),
-    fecha_inicio DATE,
-    publicidad VARCHAR2(5)
-
+    fecha_inicio DATE
 );
 
 CREATE TABLE Plus(
@@ -79,7 +77,6 @@ CREATE TABLE Usuario(
     id_free NUMBER(6) NULL,
     id_pluss NUMBER(6) NULL,
     id_localizacion NUMBER(6),
-    organizador_grupo VARCHAR2(50) NULL, 
     correo VARCHAR2(50),
     contrasenia VARCHAR2(12),
     fecha_conexion DATE,
@@ -92,7 +89,8 @@ CREATE TABLE Grupo(
     estado VARCHAR2(1),
     reglas VARCHAR2(1000),
     descripcion VARCHAR2(280),
-    miembros VARCHAR2(50)
+    miembros VARCHAR2(50),
+    organizador_grupo VARCHAR2(50) NOT NULL 
 );
 
 CREATE TABLE UsuarioXgrupo(
@@ -110,13 +108,13 @@ CREATE TABLE Chat(
 CREATE TABLE Intercambio(
     id_inter NUMBER(6) NOT NULL,
     id_chat NUMBER(10),
-    libro_inter1 NUMBER(10),
-    usuario1 NUMBER(10),
-    libro_inter2 NUMBER(10),
-    usuario2 NUMBER(10),
+    libro_inter1 NUMBER(10) NOT NULL,
+    usuario1 NUMBER(10) NOT NULL,
+    libro_inter2 NUMBER(10) NOT NULL,
+    usuario2 NUMBER(10) NOT NULL,
     fechaCreacion DATE,
-    fechaEntrega DATE,
-    calificacion NUMBER(1),
+    fechaEntrega DATE NULL,
+    calificacion NUMBER(1) NULL,
     estado VARCHAR2(1)
 );
 
@@ -274,55 +272,34 @@ FROM user_triggers;
 
 /*Ad*/
 /* el estado inicial de una notificacion es oculto*/
+CREATE SEQUENCE secuencia_noti
+  START WITH 100
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+
 CREATE OR REPLACE TRIGGER TR_Notificacion_Estado_inicial
 BEFORE INSERT ON Notificacion
 FOR EACH ROW
+DECLARE
+  estadoDeNoti VARCHAR2(20);
 BEGIN
-    If :NEW.estado = null AND :NEW.fecha = null THEN
-        :NEW.estado := 'Solicitado';
+    SELECT estado INTO estadoDeNoti FROM intercambio WHERE id_inter = :NEW.id_inter;
+    If :NEW.estado = null OR :NEW.fecha = null OR :NEW.fecha=null THEN
+        :NEW.estado := estadoDeNoti;
         :NEW.fecha := SYSDATE;
+        :NEW.codigo_noti:=secuencia_noti.NEXTVAL;
     END IF;
 END; 
 /
 
-/*Mo*/
-/*El estado se puede modificar de "Solicitado" a  "Cancelado" y de "En proceso" a "Entregado".*/
-CREATE OR REPLACE TRIGGER TR_Notificacion_ModEstado
-BEFORE UPDATE ON Notificacion
-FOR EACH ROW
-BEGIN
-    IF :OLD.estado = 'Solicitado' AND :NEW.estado != 'Cancelado' THEN
-        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
-    END IF;
-    IF :OLD.estado = 'En proceso' AND :NEW.estado != 'Entregado' THEN
-        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
-    END IF;
-END;
-/
-/*El estado puede pasar a "Oculto" una vez el estado este en "Cancelado" o "Entregado"*/
-CREATE OR REPLACE TRIGGER TR_Notificacion_ModEstadoAOculto
-BEFORE UPDATE ON Notificacion
-FOR EACH ROW
-BEGIN
-    IF :OLD.estado = 'Cancelado' OR :OLD.estado = 'Entregado' THEN
-        IF :NEW.estado != 'Oculto' THEN
-            RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
-        END IF;
-    END IF;
-END;
-/
-
 /*EL*/
 /*Solo se puede eliminar las notificaciones en "Oculto"*/
-CREATE OR REPLACE TRIGGER TR_Notificacion_Eliminar
-BEFORE DELETE ON Notificacion
-FOR EACH ROW
-BEGIN
-    IF :OLD.estado != 'Oculto' THEN
-        RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar una notificacion que no este en oculto');
-    END IF;
-END;
-/
+ALTER TABLE Notificacion DROP CONSTRAINT FK_Notificacion;
+ALTER TABLE Notificacion ADD CONSTRAINT FK_Notificacion FOREIGN KEY (id_inter) REFERENCES Intercambio(id_inter) ON DELETE CASCADE;
 
 /*Mantener libros*/
 
@@ -333,7 +310,7 @@ CREATE OR REPLACE TRIGGER TR_Libro_inicial
 BEFORE INSERT ON Libro
 FOR EACH ROW
 BEGIN
-    If :NEW.titulo = null AND :NEW.autor = null AND :NEW.sinopsis = null AND :NEW.editorial = null AND :NEW.fecha_impresion = null THEN
+    If :NEW.autor = null OR :NEW.sinopsis = null OR :NEW.editorial = null OR :NEW.fecha_impresion = null THEN
         RAISE_APPLICATION_ERROR(-20002, 'Faltan datos obligatorios');
     END IF;
 END; 
@@ -353,7 +330,7 @@ CREATE OR REPLACE TRIGGER TR_Libro_inicial_estado
 BEFORE INSERT ON Libro
 FOR EACH ROW
 BEGIN
-    If :NEW.estado = null AND :NEW.estado = null THEN
+    If :NEW.estado = null THEN
         :NEW.estado := secuencia_libro.NEXTVAL;
         :NEW.estado := 'A';
     ELSE
@@ -368,79 +345,138 @@ a cerrado si el libro esta en un proceso de intercambio.*/
 CREATE OR REPLACE TRIGGER TR_Libro_ModificarEstado
 BEFORE UPDATE ON Libro
 FOR EACH ROW
+DECLARE
+    estadoLibro VARCHAR2(20);
 BEGIN 
-    IF :OLD.estado = 'A' AND :NEW.estado != 'C' THEN
-        RAISE_APPLICATION_ERROR(-20003,'Solo se puede pasar a estado abierto');
-    ELSIF :OLD.estado = 'C' AND :NEW.estado != 'C' THEN
-        RAISE_APPLICATION_ERROR(-20003,'Solo se puede pasar a estado oculto');
+    SELECT estado INTO estadoLibro FROM Intercambio WHERE libro_inter1 LIKE :OLD.ISBN OR libro_inter2 LIKE :OLD.ISBN;
+    IF :OLD.estado = 'A' AND :NEW.estado = 'C'  THEN
+        IF estadoLibro!='Solicitado' OR estadoLibro!='En proceso' THEN
+            RAISE_APPLICATION_ERROR(-20003,'Solo se pasar a cerrado si esta en un proceso de intercambio');
+        END IF;
+    END IF;
+    IF :OLD.estado = 'C' AND :NEW.estado = 'A'  THEN
+        IF estadoLibro!='Cancelado' THEN
+            RAISE_APPLICATION_ERROR(-20003,'El libro esta en un proceso');
+        END IF;
     END IF;
 END;
 /
-/*Solo se pueden eliminar libros con un proceso cerrado y entregado.*/
 
-
+/*Solo se pueden eliminar libros que nunca tuvieron un proceso de intercambio*/
+CREATE OR REPLACE TRIGGER TR_Libro_Eliminar_Libro
+BEFORE DELETE ON Libro
+FOR EACH ROW
+DECLARE
+    idIntercambio VARCHAR2(20);
+BEGIN
+  SELECT id_inter INTO idIntercambio FROM Intercambio WHERE libro_inter1 LIKE :OLD.ISBN OR libro_inter2 LIKE :OLD.ISBN;
+  IF idIntercambio != null THEN
+    RAISE_APPLICATION_ERROR(-20003,'Solo se puede eliminar libros que nunca tuvieron algun proceso de intercambio');
+  END IF;
+END;
+/
 
 /*Mantener intercambios*/
 
 /*Ad*/
+CREATE SEQUENCE secuencia_intercambio
+  START WITH 1
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+/
 
-/*los Libros solicitados deben estar disponibles*/
-CREATE OR REPLACE TRIGGER TR_Libro_dip
+/*los usuarios deben ser diferentes*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_Usuario_dif
+BEFORE INSERT ON Intercambio
+FOR EACH ROW
+BEGIN
+  IF :NEW.usuario1 LIKE :NEW.usuario2 THEN
+    RAISE_APPLICATION_ERROR(-20003,'Son los mismos usuarios');
+  END IF;
+END;
+/
+
+/*los Libros solicitados deben estar disponibles y deben pertenecer a un usuario*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_Libro_Disponible
 BEFORE INSERT ON Intercambio
 FOR EACH ROW
 DECLARE
-    disp VARCHAR2(10);   
+    disp1 VARCHAR2(10);
+    disp2 VARCHAR(10);   
 BEGIN 
-    SELECT estado INTO disp FROM Libro WHERE ISBN = :NEW.libro_inter1 AND estado = 'A';
-    IF disp != 'true' THEN
-        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE');
-    END IF;
-    SELECT estado INTO disp FROM Libro WHERE ISBN = :NEW.libro_inter2 AND estado = 'A';
-    IF disp != 'true' THEN
+    SELECT estado INTO disp1 FROM Libro WHERE ISBN = :NEW.libro_inter1 AND estado = 'A' AND id_usuario = :NEW.usuario1;
+    SELECT estado INTO disp2 FROM Libro WHERE ISBN = :NEW.libro_inter2 AND estado = 'A'AND id_usuario = :NEW.usuario2;
+    IF disp1 != 'true' OR disp2!='true' THEN
         RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE');
     END IF;
 END;
 /
+
+/*El id del intercambio se genera automaticamente y el numero de calificacion es null.*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_Insert
+BEFORE INSERT ON Intercambio
+FOR EACH ROW
+BEGIN
+  IF :NEW.calificacion != null THEN
+    RAISE_APPLICATION_ERROR(-20003,'Califiacion no debe tener valor');
+  END IF;
+  IF :NEW.fechaEntrega!=null THEN
+    RAISE_APPLICATION_ERROR(-20003,'Fecha de entrega no debe tener valor');
+  END IF;
+  IF :NEW.id_inter = null OR :NEW.estado = null OR :NEW.fechaCreacion = null THEN
+    :new.id_inter := secuencia_intercambio.NEXTVAL;
+    :new.estado := 'Solicitado';
+    :new.fechaCreacion := SYSDATE();
+  END IF;
+END;
+/
+
 /*Mo*/
 
-/* Sólo se pueden modificar todos los datos de intercambio si la notificacion está en estado oculta*/
-CREATE OR REPLACE TRIGGER TR_ModificarEstadoOculta
+/*El estado se puede modificar de "Solicitado" a  "Cancelado" y de "En proceso" a "Entregado".
+  -El estado puede pasar a "Oculto" una vez el estado este en "Cancelado" o "Entregado".*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_ModEstado
 BEFORE UPDATE ON Intercambio
 FOR EACH ROW
-DECLARE
-    estado_actual CHAR(1);
 BEGIN
-    SELECT estado INTO estado_actual FROM Notificacion WHERE :OLD.numero = :NEW.numero;
-    IF estado_actual != 'O' AND :NEW.estado != 'A'THEN
-        RAISE_APPLICATION_ERROR(-20003,'Solo se puede modificar si el estado es oculto');
+    IF :OLD.estado = 'Solicitado' AND :NEW.estado != 'Cancelado' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
     END IF;
-END IF;
+    IF :OLD.estado = 'En proceso' AND :NEW.estado != 'Entregado' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
+    END IF;
+END;
+/
+/*Sólo se pueden modificar la calificacion una vez el intercambio sea entregado junto con su fecha de entrega.*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_Calificacion
+BEFORE UPDATE ON Intercambio
+FOR EACH ROW
+BEGIN
+  IF :OLD.estado != 'Entregado' THEN
+    RAISE_APPLICATION_ERROR(-20002, 'No se puede dar clifiacion o dar la fecha de entrega si el intercambio no esta entregado');
+  END IF;
+END;
 /
 /*El*/
-   /*-Solo se puede eliminar los intercambios con notificaciones ocultos*/
-
-ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_chat;
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_chat FOREIGN KEY (id_chat) 
-REFERENCES Chat(id_chat)ON DELETE CASCADE;
-
-ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_ISBN1;
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN1 FOREIGN KEY (libro_inter1, usuario1) 
-REFERENCES Libro(ISBN, id_usuario) ON DELETE CASCADE;
-
-ALTER TABLE Intercambio DROP CONSTRAINT FK_Intercambio_ISBN2;
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_idu FOREIGN KEY (libro_inter2, usuario2) 
-REFERENCES Libro(ISBN, id_usuario)ON DELETE CASCADE;
-
-
-create or replace TRIGGER TR_Eliminar_inter
+/*-Solo se puede eliminar los intercambios con notificaciones ocultos*/
+CREATE OR REPLACE TRIGGER TR_Intercambio_Eliminar
 BEFORE DELETE ON Notificacion
 FOR EACH ROW
 BEGIN
-    IF :OLD.estado != 'O' THEN
-        RAISE_APPLICATION_ERROR(-20003,'No esta en estado oculto');
+    IF :OLD.estado != 'Oculto' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar una notificacion que no este en oculto');
     END IF;
 END;
 /
+/*Crear un cascade en por si eliminan libros*/
+
+/*Mantener usuario*/
+
+/*Ad/
 
 /*VISTAS*/
 --Vista de usuarios con planes Plus
@@ -908,7 +944,7 @@ CREATE OR REPLACE PACKAGE BODY PC_USUARIO AS
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
     END;
 END PC_USUARIO;
-
+/
 
 
 
