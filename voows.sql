@@ -28,9 +28,8 @@ CREATE TABLE Publicidad(
 );
 
 CREATE TABLE Libro(
-    id_usuario NUMBER(10) NOT NULL,
-    ISBN NUMBER(10) NOT NULL,
-    titulo VARCHAR2(50),
+    nombreUsuario VARCHAR2(16) NOT NULL,
+    titulo VARCHAR2(50) NOT NULL,
     autor VARCHAR2(30),
     sinopsis VARCHAR2(280),
     editorial VARCHAR2(30),
@@ -41,16 +40,16 @@ CREATE TABLE Libro(
 
 CREATE TABLE Archivo(
     codigo NUMBER(6) NOT NULL,
-    ISBN_libros NUMBER(10) NOT NULL,
-    id_usuario NUMBER(10) NOT NULL,
+    titulo VARCHAR2(50) NOT NULL,
+    nombreUsuario VARCHAR2(16) NOT NULL,
     tipo VARCHAR2(3),
     URRL VARCHAR2(50)
 );
 
 CREATE TABLE Genero(  
     genero VARCHAR2(2)NOT NULL,
-    ISBN_libros NUMBER(10),
-    id_usuario NUMBER(10)
+    titulo VARCHAR2(50),
+    nombreUsuario VARCHAR2(16)
 );
 
 
@@ -73,7 +72,7 @@ CREATE TABLE Evento(
 );
 
 CREATE TABLE Usuario(
-    idu NUMBER(10) NOT NULL,
+    nombreUsuario VARCHAR2(16) NOT NULL,
     id_free NUMBER(6) NULL,
     id_pluss NUMBER(6) NULL,
     id_localizacion NUMBER(6),
@@ -89,29 +88,28 @@ CREATE TABLE Grupo(
     estado VARCHAR2(1),
     reglas VARCHAR2(1000),
     descripcion VARCHAR2(280),
-    miembros VARCHAR2(50),
+    miembros NUMBER(10),
     organizador_grupo VARCHAR2(50) NOT NULL 
 );
 
 CREATE TABLE UsuarioXgrupo(
     nombre VARCHAR2(50) NOT NULL,
-    id_usuario NUMBER(10) NOT NULL
-    
+    nombreUsuario VARCHAR2(16) NOT NULL
 );
 
 CREATE TABLE Chat(
     id_chat NUMBER(10) NOT NULL,
     nombre_grupo VARCHAR2(50),
-    apodo VARCHAR2(12)
+    apodo VARCHAR2(12),
+    usuario1 VARCHAR2(16) NOT NULL,
+    usuario2 VARCHAR2(16) NOT NULL
 );
 
 CREATE TABLE Intercambio(
     id_inter NUMBER(6) NOT NULL,
     id_chat NUMBER(10),
-    libro_inter1 NUMBER(10) NOT NULL,
-    usuario1 NUMBER(10) NOT NULL,
-    libro_inter2 NUMBER(10) NOT NULL,
-    usuario2 NUMBER(10) NOT NULL,
+    libro_inter1 VARCHAR2(50) NOT NULL,
+    libro_inter2 VARCHAR2(50) NOT NULL,
     fechaCreacion DATE,
     fechaEntrega DATE NULL,
     calificacion NUMBER(1) NULL,
@@ -133,15 +131,15 @@ DROP TABLE UsuarioXgrupo;
 DROP TABLE Notificacion;
 DROP TABLE Intercambio;
 DROP TABLE Chat;
-DROP TABLE Planes;
-DROP TAblE Free;
-DROP TABLE Grupo;
-DROP TABLE Libro;
-DROP TABLE Localizacion;
-DROP TABLE Genero;
-DROP TABLE Usuario;
 DROP TABLE Publicidad;
+DROP TABLE Genero;
+DROP TABLE Planes;
+DROP TABLE Grupo;
+DROP TABLE Localizacion;
 DROP TABLE Plus;
+DROP TAblE Free;
+DROP TABLE Libro;
+DROP TABLE Usuario;
 
 
 /*Los usuarios en la tabla de intercambios deben ser diferentes*/
@@ -150,12 +148,10 @@ DROP TABLE Plus;
 /*Atributos*/
 ALTER TABLE Planes ADD CONSTRAINT CK_Planes_idp CHECK(idp >=0);
 ALTER TABLE Planes ADD CONSTRAINT CK_Planes_Booleano CHECK(estado = 'True' OR estado = 'False');
-ALTER TABLE Planes ADD CONSTRAINT CK_Planes_Booleano2 CHECK(publicidad = 'True' OR publicidad = 'False');
 
 ALTER TABLE Plus ADD CONSTRAINT CK_Plus_precio CHECK(precio = '15000' OR precio = '25000' OR precio = '150000');
 ALTER TABLE Plus ADD CONSTRAINT CK_Plus_medioPago CHECK(medio_pago = 'C' OR medio_pago = 'D' OR medio_pago = 'T');
 
-ALTER TABLE Libro ADD CONSTRAINT CK_Libro_ISBN CHECK (ISBN >=0);
 ALTER TABLE Libro ADD CONSTRAINT CK_Libro_estado CHECK (estado = 'A' OR estado = 'C' );
 
 ALTER TABLE Archivo ADD CONSTRAINT CK_Archivo_codigo CHECK (codigo >= 0); /*consecutivo?*/
@@ -185,7 +181,6 @@ ALTER TABLE Localizacion ADD CONSTRAINT CK_Localizacion_id CHECK(id_localizacion
 
 ALTER TABLE Evento ADD CONSTRAINT CK_Evento_id CHECK( id_evento >= 1000000);
 
-ALTER TABLE Usuario ADD CONSTRAINT CK_Usuario_id CHECK (idu >= 0); /*consecutivo?*/
 ALTER TABLE Usuario ADD CONSTRAINT CK_Usuario_correo CHECK (INSTR(correo, '@') > 0 AND INSTR(correo, '.') > 0);
 ALTER TABLE Usuario ADD CONSTRAINT CK_Usuario_estado CHECK(estado = 'A' OR estado = 'C');
 ALTER TABLE Usuario
@@ -215,20 +210,21 @@ ALTER TABLE Planes ADD CONSTRAINT PK_Planes PRIMARY KEY (idp);
 ALTER TABLE Plus ADD CONSTRAINT PK_Plus  PRIMARY KEY (idp_plan);
 ALTER TABLE Free ADD CONSTRAINT PK_Free PRIMARY KEY (idp_plan);
 ALTER TABLE Publicidad ADD CONSTRAINT PK_Publicidad PRIMARY KEY (idpu);
-ALTER TABLE Libro ADD CONSTRAINT PK_Libro PRIMARY KEY (id_usuario, ISBN);
-ALTER TABLE Archivo ADD CONSTRAINT PK_Archivo PRIMARY KEY (codigo,id_usuario, ISBN_libros);
-ALTER TABLE Genero ADD CONSTRAINT PK_Genero  PRIMARY KEY (genero,ISBN_libros,id_usuario);
+ALTER TABLE Libro ADD CONSTRAINT PK_Libro PRIMARY KEY (nombreUsuario, titulo);
+ALTER TABLE Archivo ADD CONSTRAINT PK_Archivo PRIMARY KEY (codigo,nombreUsuario, titulo);
+ALTER TABLE Genero ADD CONSTRAINT PK_Genero  PRIMARY KEY (genero,titulo,nombreUsuario);
 ALTER TABLE Localizacion ADD CONSTRAINT PK_Localizacion PRIMARY KEY (id_localizacion);
 ALTER TABLE Evento ADD CONSTRAINT PK_Evento PRIMARY KEY (id_evento);
-ALTER TABLE Usuario ADD CONSTRAINT PK_Usuario PRIMARY KEY (idu);
+ALTER TABLE Usuario ADD CONSTRAINT PK_Usuario PRIMARY KEY (nombreUsuario);
 ALTER TABLE Grupo ADD CONSTRAINT PK_Grupo  PRIMARY KEY (nombre);
-ALTER TABLE UsuarioXgrupo ADD CONSTRAINT PK_UsuarioXgrupo PRIMARY KEY (nombre,id_usuario);
+ALTER TABLE UsuarioXgrupo ADD CONSTRAINT PK_UsuarioXgrupo PRIMARY KEY (nombre,nombreUsuario);
 ALTER TABLE Chat ADD CONSTRAINT PK_Chat PRIMARY KEY (id_chat);
 ALTER TABLE Intercambio ADD CONSTRAINT PK_Intercambio PRIMARY KEY (id_inter);
 ALTER TABLE Notificacion ADD CONSTRAINT PK_Notificacion PRIMARY KEY (codigo_noti);
 
 /*Unicas*/
 ALTER TABLE Usuario ADD CONSTRAINT UK_Usuario_correo UNIQUE (correo);
+ALTER TABLE Libro ADD CONSTRAINT UK_Libro_titulo UNIQUE (titulo);
 
 
 /*Foraneas*/
@@ -239,11 +235,11 @@ ALTER TABLE Free ADD CONSTRAINT FK_Free FOREIGN KEY (idp_plan) REFERENCES Planes
 
 ALTER TABLE Publicidad ADD CONSTRAINT FK_Publicidad FOREIGN KEY (idp_plan) REFERENCES Free(idp_plan);
 
-ALTER TABLE Libro ADD CONSTRAINT FK_Libro FOREIGN KEY (id_usuario) REFERENCES Usuario(idu);
+ALTER TABLE Libro ADD CONSTRAINT FK_Libro FOREIGN KEY (nombreUsuario) REFERENCES Usuario(nombreUsuario);
 
-ALTER TABLE Archivo ADD CONSTRAINT FK_Archivo FOREIGN KEY (id_usuario, ISBN_libros) REFERENCES Libro(id_usuario, ISBN);
+ALTER TABLE Archivo ADD CONSTRAINT FK_Archivo FOREIGN KEY (nombreUsuario, titulo) REFERENCES Libro(nombreUsuario, titulo);
 
-ALTER TABLE Genero ADD CONSTRAINT FK_Genero  FOREIGN KEY (ISBN_libros,id_usuario) REFERENCES Libro(ISBN, id_usuario);
+ALTER TABLE Genero ADD CONSTRAINT FK_Genero  FOREIGN KEY (nombreUsuario, titulo) REFERENCES Libro(nombreUsuario, titulo);
 
 ALTER TABLE Evento ADD CONSTRAINT FK_Evento_grupo FOREIGN KEY (id_grupo) REFERENCES Grupo(nombre);
 ALTER TABLE Evento ADD CONSTRAINT FK_Evento_localizacion FOREIGN KEY (id_localizacion) REFERENCES Localizacion(id_localizacion);
@@ -251,22 +247,29 @@ ALTER TABLE Evento ADD CONSTRAINT FK_Evento_localizacion FOREIGN KEY (id_localiz
 ALTER TABLE Usuario ADD CONSTRAINT FK_Usuario FOREIGN KEY (id_free) REFERENCES Free(idp_plan);
 ALTER TABLE Usuario ADD CONSTRAINT FK_Usuario_pluss FOREIGN KEY (id_pluss) REFERENCES Plus(idp_plan);
 ALTER TABLE Usuario ADD CONSTRAINT FK_Usuario_localizacion FOREIGN KEY (id_localizacion) REFERENCES Localizacion(id_localizacion);
-ALTER TABLE Usuario ADD CONSTRAINT FK_Usuario_grupo FOREIGN KEY (organizador_grupo) REFERENCES Grupo(nombre);
+
+ALTER TABLE Grupo ADD CONSTRAINT FK_Grupo_Organizador FOREIGN KEY (organizador_grupo) REFERENCES Usuario(nombreUsuario);
 
 ALTER TABLE UsuarioXgrupo ADD CONSTRAINT FK_UsuarioXgrupo_nombre FOREIGN KEY (nombre) REFERENCES Grupo (nombre);
-ALTER TABLE UsuarioXgrupo ADD CONSTRAINT FK_UsuarioXgrupo_idu FOREIGN KEY (id_usuario) REFERENCES Usuario(idu);
+ALTER TABLE UsuarioXgrupo ADD CONSTRAINT FK_UsuarioXgrupo_nombreUsuario FOREIGN KEY (nombreUsuario) REFERENCES Usuario(nombreUsuario);
 
-ALTER TABLE Chat ADD CONSTRAINT FK_Chat FOREIGN KEY (nombre_grupo) REFERENCES Grupo(nombre);
+ALTER TABLE Chat ADD CONSTRAINT FK_Cha_Grupo FOREIGN KEY (nombre_grupo) REFERENCES Grupo(nombre);
+ALTER TABLE Chat ADD CONSTRAINT FK_Chat_Usuario1 FOREIGN KEY (usuario1) REFERENCES Usuario(nombreUsuario);
+ALTER TABLE Chat ADD CONSTRAINT FK_Chat_Usuario2 FOREIGN KEY (usuario2) REFERENCES Usuario(nombreUsuario);
 
 ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_chat FOREIGN KEY (id_chat) REFERENCES Chat(id_chat);
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN1 FOREIGN KEY (libro_inter1,usuario1) REFERENCES Libro(ISBN, id_usuario);
-ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_ISBN2 FOREIGN KEY (libro_inter2, usuario2) REFERENCES Libro(ISBN, id_usuario);
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_Titulo1 FOREIGN KEY (libro_inter1) REFERENCES Libro(titulo);
+ALTER TABLE Intercambio ADD CONSTRAINT FK_Intercambio_Titulo2 FOREIGN KEY (libro_inter2) REFERENCES Libro(titulo);
 
 ALTER TABLE Notificacion ADD CONSTRAINT FK_Notificacion FOREIGN KEY (id_inter) REFERENCES Intercambio(id_inter);
 
-/*ELIMINAR TODOS LOS TRIGGER*/
+/*ELIMINAR TODOS LOS TRIGGER Y SECUENCIAS*/
 SELECT 'DROP TRIGGER ' || trigger_name || ';' 
 FROM user_triggers;
+
+SELECT 'DROP SEQUENCE ' || sequence_name || ';' AS statement
+FROM user_sequences;
+
 
 /*Mantener notificaciones*/
 
@@ -280,6 +283,7 @@ CREATE SEQUENCE secuencia_noti
   NOCYCLE
   NOCACHE
   ORDER;
+/
 
 CREATE OR REPLACE TRIGGER TR_Notificacion_Estado_inicial
 BEFORE INSERT ON Notificacion
@@ -315,23 +319,13 @@ BEGIN
     END IF;
 END; 
 /
-/*el estado de un libro se genera en abierto y el numero es automatizado*/
-CREATE SEQUENCE secuencia_libro
-  START WITH 1
-  INCREMENT BY 1
-  MAXVALUE 999999999
-  MINVALUE 1
-  NOCYCLE
-  NOCACHE
-  ORDER;
-/
+/*el estado de un libro se genera en abierto*/
 
 CREATE OR REPLACE TRIGGER TR_Libro_inicial_estado
 BEFORE INSERT ON Libro
 FOR EACH ROW
 BEGIN
     If :NEW.estado = null THEN
-        :NEW.estado := secuencia_libro.NEXTVAL;
         :NEW.estado := 'A';
     ELSE
         RAISE_APPLICATION_ERROR(-20002, 'El estado inicial debe ser abierto');
@@ -348,7 +342,7 @@ FOR EACH ROW
 DECLARE
     estadoLibro VARCHAR2(20);
 BEGIN 
-    SELECT estado INTO estadoLibro FROM Intercambio WHERE libro_inter1 LIKE :OLD.ISBN OR libro_inter2 LIKE :OLD.ISBN;
+    SELECT estado INTO estadoLibro FROM Intercambio WHERE libro_inter1 LIKE :OLD.titulo OR libro_inter2 LIKE :OLD.titulo;
     IF :OLD.estado = 'A' AND :NEW.estado = 'C'  THEN
         IF estadoLibro!='Solicitado' OR estadoLibro!='En proceso' THEN
             RAISE_APPLICATION_ERROR(-20003,'Solo se pasar a cerrado si esta en un proceso de intercambio');
@@ -369,7 +363,7 @@ FOR EACH ROW
 DECLARE
     idIntercambio VARCHAR2(20);
 BEGIN
-  SELECT id_inter INTO idIntercambio FROM Intercambio WHERE libro_inter1 LIKE :OLD.ISBN OR libro_inter2 LIKE :OLD.ISBN;
+  SELECT id_inter INTO idIntercambio FROM Intercambio WHERE libro_inter1 LIKE :OLD.titulo OR libro_inter2 LIKE :OLD.titulo;
   IF idIntercambio != null THEN
     RAISE_APPLICATION_ERROR(-20003,'Solo se puede eliminar libros que nunca tuvieron algun proceso de intercambio');
   END IF;
@@ -389,29 +383,21 @@ CREATE SEQUENCE secuencia_intercambio
   ORDER;
 /
 
-/*los usuarios deben ser diferentes*/
-CREATE OR REPLACE TRIGGER TR_Intercambio_Usuario_dif
-BEFORE INSERT ON Intercambio
-FOR EACH ROW
-BEGIN
-  IF :NEW.usuario1 LIKE :NEW.usuario2 THEN
-    RAISE_APPLICATION_ERROR(-20003,'Son los mismos usuarios');
-  END IF;
-END;
-/
-
 /*los Libros solicitados deben estar disponibles y deben pertenecer a un usuario*/
 CREATE OR REPLACE TRIGGER TR_Intercambio_Libro_Disponible
 BEFORE INSERT ON Intercambio
 FOR EACH ROW
 DECLARE
+    usuarioInter1 VARCHAR2(16);
+    usuarioInter2 VARCHAR2(16);
     disp1 VARCHAR2(10);
     disp2 VARCHAR(10);   
 BEGIN 
-    SELECT estado INTO disp1 FROM Libro WHERE ISBN = :NEW.libro_inter1 AND estado = 'A' AND id_usuario = :NEW.usuario1;
-    SELECT estado INTO disp2 FROM Libro WHERE ISBN = :NEW.libro_inter2 AND estado = 'A'AND id_usuario = :NEW.usuario2;
+    SELECT usuario1,usuario2 INTO usuarioInter1,usuarioInter2 FROM Chat WHERE id_chat=:NEW.id_chat;
+    SELECT estado INTO disp1 FROM Libro WHERE titulo = :NEW.libro_inter1 AND estado = 'A' AND nombreUsuario = usuarioInter1;
+    SELECT estado INTO disp2 FROM Libro WHERE titulo = :NEW.libro_inter2 AND estado = 'A'AND nombreUsuario = usuarioInter2;
     IF disp1 != 'true' OR disp2!='true' THEN
-        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE');
+        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE o Totulo del libro no existe');
     END IF;
 END;
 /
@@ -449,6 +435,12 @@ BEGIN
     IF :OLD.estado = 'En proceso' AND :NEW.estado != 'Entregado' THEN
         RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
     END IF;
+    IF :OLD.estado ='Cancelado' AND :NEW.estado != 'Oculto' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
+    END IF;
+    IF :OLD.estado ='Entregado' AND :NEW.estado != 'Oculto' THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar');
+    END IF;
 END;
 /
 /*Sólo se pueden modificar la calificacion una vez el intercambio sea entregado junto con su fecha de entrega.*/
@@ -481,14 +473,14 @@ END;
 /*VISTAS*/
 --Vista de usuarios con planes Plus
 CREATE VIEW usuarios_plus AS
-SELECT u.idu, u.nombre, p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
+SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
 FROM Usuario u
 INNER JOIN Planes p ON u.id_pluss = p.idp
 INNER JOIN Plus pl ON p.idp = pl.idp_plan;
 
 --Vista de usuarios con planes Free
 CREATE VIEW usuarios_free AS
-SELECT u.idu, u.nombre, p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
+SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
 FROM Usuario u
 INNER JOIN Planes p ON u.id_free = p.idp
 INNER JOIN Free f ON p.idp = f.idp_plan;
@@ -510,8 +502,8 @@ LEFT JOIN Localizacion loc ON e.id_localizacion = loc.id_localizacion;
 CREATE VIEW intercambios_usuarios AS
 SELECT i.id_inter, i.id_chat, i.libro_inter1, u1.nombre AS nombre_usuario1, i.libro_inter2, u2.nombre AS nombre_usuario2, i.fechaCreacion, i.fechaEntrega, i.calificacion, i.estado
 FROM Intercambio i
-INNER JOIN Usuario u1 ON i.usuario1 = u1.idu
-INNER JOIN Usuario u2 ON i.usuario2 = u2.idu;
+INNER JOIN Usuario u1 ON i.usuario1 = u1.nombreUsuario
+INNER JOIN Usuario u2 ON i.usuario2 = u2.nombreUsuario;
 
 
 --Vista de eventos activos
@@ -841,8 +833,8 @@ END PC_USUARIO;
 /
 CREATE OR REPLACE PACKAGE PC_USUARIO_JUNTA AS
     PROCEDURE adicionar_Usuario(us_id_free IN NUMBER, us_pluss IN NUMBER,us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
-    PROCEDURE modificar_Usuario(us_idu IN NUMBER, us_id_free IN NUMBER, us_pluss IN NUMBER, us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
-    PROCEDURE eliminar_Usuario(us_idu IN NUMBER);
+    PROCEDURE modificar_Usuario(us_nombreUsuario IN NUMBER, us_id_free IN NUMBER, us_pluss IN NUMBER, us_localizacion IN NUMBER, us_organizador_grupo IN VARCHAR,  us_correo IN VARCHAR, us_contrasenia IN VARCHAR, us_fecha_conexion IN DATE, us_nombre IN VARCHAR, us_estado IN VARCHAR);
+    PROCEDURE eliminar_Usuario(us_nombreUsuario IN NUMBER);
 /
 
 --Procedimiento para adicionar un usuario
@@ -871,7 +863,7 @@ PROCEDURE adicionar_Usuario(
 
 -- Procedimiento para modificar un Usuario
   PROCEDURE modificar_Usuario(
-    us_idu IN NUMBER,
+    us_nombreUsuario IN NUMBER,
     us_id_free IN NUMBER, 
     us_pluss IN NUMBER, 
     us_localizacion IN NUMBER, 
@@ -895,7 +887,7 @@ PROCEDURE adicionar_Usuario(
       fecha_conexion = us_fecha_conexion,
       nombre = us_nombre,
       estado = us_estado
-    WHERE idu = us_idu;
+    WHERE nombreUsuario = us_nombreUsuario;
     IF(SQL%ROWCOUNT = 0) THEN
         RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
     END IF;
@@ -907,9 +899,9 @@ PROCEDURE adicionar_Usuario(
   END;
 
 --Procedimiento para eliminar un usuario
-  PROCEDURE eliminar_Usuario(us_idu IN NUMBER) IS
+  PROCEDURE eliminar_Usuario(us_nombreUsuario IN NUMBER) IS
   BEGIN
-    DELETE FROM Usuario WHERE idu = us_idu;
+    DELETE FROM Usuario WHERE nombreUsuario = us_nombreUsuario;
     IF(SQL%ROWCOUNT = 0) THEN
         RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
     END IF;
