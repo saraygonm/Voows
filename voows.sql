@@ -1,7 +1,7 @@
 /*CODIGO SQL PROYECTO VOOWS*/
 
 /*Tablas*/
-CREATE TABLE Planes(
+CREATE TABLE Plan(
     idp NUMBER(6) NOT NULL,
     estado VARCHAR2(5),
     fecha_inicio DATE
