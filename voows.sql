@@ -937,7 +937,345 @@ CREATE OR REPLACE PACKAGE BODY PC_USUARIO AS
     END;
 END PC_USUARIO;
 /
+--------------------------------------------------------------------------------------------------------
+/*Funciones*/
+--Junta directiva
+--Mantener publicidad
+CREATE OR REPLACE TRIGGER mantener_publicidad
+BEFORE INSERT OR UPDATE OR DELETE ON Publicidad
+FOR EACH ROW
+DECLARE
+    tiene_plan_pluss NUMBER(1);
+BEGIN
+    IF UPDATING THEN
+        -- No se permite la modificacion del ID de la publicidad
+        IF :new.idpu <> :old.idpu THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el ID de la publicidad.');
+        END IF;
+    END IF;
 
+    IF DELETING THEN
+        -- Verificar si el usuario tiene el plan pluss
+        SELECT COUNT(*) INTO tiene_plan_pluss
+        FROM Usuario
+        WHERE idp_plan = :old.idp_plan
+        AND id_pluss IS NOT NULL;
+
+        IF tiene_plan_pluss = 0 THEN
+            RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar la publicidad para usuarios sin el plan pluss.');
+        END IF;
+    END IF;
+END;
+/
+
+--Usuario:
+--Mantener libro
+CREATE TRIGGER mantener_libro
+BEFORE INSERT ON libros
+FOR EACH ROW
+BEGIN
+    DECLARE estado_anterior VARCHAR(10);
+    
+    IF NEW.estado = 'cerrado' THEN
+        SET estado_anterior = (
+            SELECT estado
+            FROM libros
+            WHERE id = NEW.id
+        );
+        
+        IF estado_anterior = 'abierto' THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'No se puede cambiar el estado de un libro de abierto a cerrado sin un proceso de intercambio.';
+        END IF;
+    END IF;
+    
+    IF NEW.estado = 'abierto' THEN
+        SET estado_anterior = (
+            SELECT estado
+            FROM libros
+            WHERE id = NEW.id
+        );
+        
+        IF estado_anterior = 'cerrado' THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'No se puede cambiar el estado de un libro de cerrado a abierto si tuvo un proceso cancelado.';
+        END IF;
+    END IF;
+END;
+
+--Mantener intercambios
+CREATE TRIGGER mantener_intercambios
+BEFORE INSERT ON intercambios
+FOR EACH ROW
+BEGIN
+    DECLARE disponibles1 INT;
+    DECLARE disponibles2 INT;
+    DECLARE libro_valido INT;
+    DECLARE usuario_valido INT;
+    
+    -- Verifica la disponibilidad de "cantidad_de_megustas" en ambos usuarios
+    SELECT cantidad_de_megustas INTO disponibles1
+    FROM usuarios
+    WHERE id = NEW.id_usuario1;
+    
+    SELECT cantidad_de_megustas INTO disponibles2
+    FROM usuarios
+    WHERE id = NEW.id_usuario2;
+    
+    IF disponibles1 >= NEW.cantidad_de_megustas AND disponibles2 >= NEW.cantidad_de_megustas THEN
+        -- Verifica si los libros solicitados estan disponibles y pertenecen a un usuario
+        SELECT COUNT(*) INTO libro_valido
+        FROM libros
+        WHERE id = NEW.id_libro1 AND id_usuario = NEW.id_usuario1 AND disponible = 1;
+        
+        SELECT COUNT(*) INTO libro_valido
+        FROM libros
+        WHERE id = NEW.id_libro2 AND id_usuario = NEW.id_usuario2 AND disponible = 1;
+        
+        IF libro_valido = 2 THEN
+            SET NEW.id_intercambio = UUID();  -- automatizacion del ID
+            
+            -- numero de calificacion como NULL y el estado como "Solicitado"
+            SET NEW.calificacion = NULL;
+            SET NEW.estado = 'Solicitado';
+            SET NEW.fecha = CURRENT_TIMESTAMP; --fecha actual como la fecha del intercambio
+        ELSE
+            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Los libros solicitados no están disponibles o no pertenecen a los usuarios';
+        END IF;
+    ELSE
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Los usuarios no tienen suficiente cantidad_de_megustas disponibles';
+    END IF;
+END;
+
+--Registrar evento
+CREATE TRIGGER validar_evento
+BEFORE INSERT ON eventos
+FOR EACH ROW
+BEGIN
+    IF NEW.nombre_evento IS NULL OR NEW.proposito IS NULL OR NEW.fecha_inicio IS NULL OR NEW.fecha_fin IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Todos los campos obligatorios deben ser proporcionados.';
+    END IF;
+    
+    IF NEW.fecha_inicio >= NEW.fecha_fin THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'La fecha de inicio debe ser anterior a la fecha de finalización.';
+    END IF;
+END;
+
+--Mantener Grupos
+CREATE OR REPLACE TRIGGER mantener_grupos
+BEFORE INSERT OR UPDATE ON Grupo
+FOR EACH ROW
+DECLARE
+    v_usuario VARCHAR2(50);
+BEGIN
+    -- Obtener el usuario actual
+    SELECT USER INTO v_usuario FROM dual;
+
+    -- Verificar si se esta insertando un nuevo grupo
+    IF INSERTING THEN
+        :NEW.organizador_grupo := v_usuario;
+        :NEW.estado := 'A'; -- estado del grupo como "activo"
+    END IF;
+
+    IF UPDATING('miembros') THEN
+        :NEW.miembros := :NEW.miembros;
+    END IF;
+    IF UPDATING('organizador_grupo') THEN
+        IF :NEW.organizador_grupo <> v_usuario THEN -- Restringir la actualizacion del organizador al usuario actual
+            RAISE_APPLICATION_ERROR(-20001, 'No tienes permiso para cambiar el organizador del grupo.');
+        END IF;
+    END IF;
+END;
+/
+--Mantener chat
+
+CREATE OR REPLACE TRIGGER mantener_chats
+BEFORE INSERT OR UPDATE OR DELETE ON Chat
+FOR EACH ROW
+DECLARE
+    intercambios_en_proceso NUMBER(1);
+BEGIN
+    IF INSERTING THEN
+        -- Verificar que el chat no sea creado solo con un usuario
+        IF :new.usuario1 = :new.usuario2 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'El chat debe incluir a dos usuarios diferentes.');
+        END IF;
+
+        -- Generar el apodo del chat si no se proporciona
+        IF :new.apodo IS NULL THEN
+            :new.apodo := 'Chat ' || :new.usuario1 || ' ' || :new.usuario2;
+        END IF;
+    END IF;
+
+    IF UPDATING('apodo') THEN
+        -- No se permiten cambios en el apodo del chat
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar el apodo del chat.');
+    END IF;
+
+    IF DELETING THEN
+        -- Verificar si hay intercambios en proceso relacionados con el chat
+        SELECT COUNT(*) INTO intercambios_en_proceso
+        FROM Intercambio
+        WHERE id_chat = :old.id_chat
+        AND estado = 'P';
+
+        IF intercambios_en_proceso > 0 THEN
+            RAISE_APPLICATION_ERROR(-20003, 'No se puede eliminar el chat mientras haya intercambios en proceso.');
+        END IF;
+    END IF;
+END;
+/
+
+--Servidor
+--Registrar Localizacion
+CREATE OR REPLACE TRIGGER registrar_localizacion
+BEFORE INSERT OR UPDATE OR DELETE ON Localizacion
+FOR EACH ROW
+BEGIN
+    IF INSERTING THEN
+        -- Generar automaticamente la localizacion usando la ubicacion actual del usuario
+        :new.latitud := obtener_latitud();
+        :new.longitud := obtener_longitud();
+    END IF;
+
+    IF UPDATING('latitud') OR UPDATING('longitud') THEN
+        -- No se permite modificar la localizacion
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar la localización.');
+    END IF;
+
+    IF DELETING THEN
+        -- No se permite eliminar la localizacion
+        RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar la localización.');
+    END IF;
+END;
+/
+--Mantener notificaciones
+CREATE OR REPLACE TRIGGER mantener_notificaciones
+BEFORE INSERT OR UPDATE OR DELETE ON Intercambio
+FOR EACH ROW
+BEGIN
+    IF INSERTING THEN
+        INSERT INTO Notificacion(codigo_noti, id_inter, estado, descripcion, fecha)
+        VALUES(notificacion_sequence.NEXTVAL, :new.id_inter, :new.estado, NULL, SYSDATE);
+    ELSIF UPDATING('descripcion') THEN
+        -- No se permiten cambios en la descripcion de la notificacion
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar la descripción de la notificación.');
+    ELSIF DELETING THEN
+        -- Eliminar las notificaciones asociadas al intercambio que esta siendo eliminado
+        DELETE FROM Notificacion
+        WHERE id_inter = :old.id_inter;
+    END IF;
+END;
+/
+--Mantener usuario
+
+CREATE OR REPLACE TRIGGER mantener_usuarios
+BEFORE INSERT OR UPDATE OR DELETE ON Usuario
+FOR EACH ROW
+DECLARE
+    intercambios_activos NUMBER(1);
+    es_organizador NUMBER(1);
+BEGIN
+    IF INSERTING THEN
+        -- Verificar que el usuario pertenezca a un plan y tenga una localizacion
+        IF :new.id_free IS NULL AND :new.id_pluss IS NULL THEN
+            RAISE_APPLICATION_ERROR(-20001, 'El usuario debe pertenecer a un plan.');
+        END IF;
+
+        IF :new.id_localizacion IS NULL THEN
+            RAISE_APPLICATION_ERROR(-20002, 'El usuario debe tener una localización asignada.');
+        END IF;
+        :new.estado := 'A'; -- El estado del usuario inicia en "A" (Activo)
+    END IF;
+
+    IF UPDATING('estado') THEN
+        -- Verificar si el usuario tiene intercambios activos
+        SELECT COUNT(*) INTO intercambios_activos
+        FROM Intercambio
+        WHERE (usuario1 = :new.nombreUsuario OR usuario2 = :new.nombreUsuario)
+        AND estado IN ('S', 'P');
+
+        IF intercambios_activos > 0 THEN
+            RAISE_APPLICATION_ERROR(-20003, 'No se puede modificar el estado del usuario mientras tenga intercambios activos.');
+        END IF;
+    END IF;
+
+    IF UPDATING('fecha_conexion') THEN
+        -- La fecha de conexion puede ser modificada
+    END IF;
+    IF UPDATING('contrasenia') THEN
+        -- La contrasena puede ser modificada
+    END IF;
+
+    IF DELETING THEN
+        -- Verificar si el usuario es organizador de un grupo
+        SELECT COUNT(*) INTO es_organizador
+        FROM Grupo
+        WHERE organizador = :old.nombreUsuario;
+
+        IF es_organizador > 0 THEN
+            RAISE_APPLICATION_ERROR(-20004, 'No se puede eliminar el usuario mientras sea organizador de algún grupo.');
+        END IF;
+
+        -- Verificar si el usuario tiene intercambios activos
+        SELECT COUNT(*) INTO intercambios_activos
+        FROM Intercambio
+        WHERE (usuario1 = :old.nombreUsuario OR usuario2 = :old.nombreUsuario)
+        AND estado IN ('S', 'P');
+
+        IF intercambios_activos > 0 THEN
+            RAISE_APPLICATION_ERROR(-20005, 'No se puede eliminar el usuario mientras tenga intercambios activos.');
+        END IF;
+    END IF;
+END;
+/
+--Mantener plan
+CREATE OR REPLACE TRIGGER mantener_planes
+BEFORE INSERT OR UPDATE OR DELETE ON Planes
+FOR EACH ROW
+DECLARE
+    cantidad_megustas NUMBER(2);
+BEGIN
+    IF INSERTING THEN
+        -- Todos los datos del plan son automaticos
+        :new.estado := 'true';
+        :new.fecha_inicio := SYSDATE;
+    END IF;
+
+    IF UPDATING('estado') THEN
+        -- Verificar si el plan ya no pertenece a un usuario
+        IF :new.estado = 'false' THEN
+            -- Realizar las acciones correspondientes cuando el estado cambia a false
+        END IF;
+    END IF;
+
+    IF DELETING THEN
+        -- Verificar si el plan tiene estado en false antes de permitir su eliminacion
+        IF :old.estado <> 'false' THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Solo se pueden eliminar planes con estado en false.');
+        END IF;
+    END IF;
+
+    -- Verificar condiciones adicionales para los planes plus
+    IF :new.estado = 'plus' THEN
+        -- Si es un plan plus, la cantidad de me gustas es dada por el precio
+        :new.cantidad_megustas := 
+
+        -- Verificar que el metodo de pago no sea null
+        IF :new.metodo_pago IS NULL THEN
+            RAISE_APPLICATION_ERROR(-20002, 'El metodo de pago no puede ser null para un plan plus.');
+        END IF;
+    END IF;
+
+    -- Verificar condiciones adicionales para los planes free
+    IF :new.estado = 'free' THEN
+        -- Si es un plan free, la cantidad de me gustas debe ser menor a 100
+        IF :new.cantidad_megustas >= 100 THEN
+            RAISE_APPLICATION_ERROR(-20003, 'La cantidad de me gustas para un plan free debe ser menor a 100.');
+        END IF;
+    END IF;
+END;
+/
 
 
 
