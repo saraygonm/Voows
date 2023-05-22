@@ -1,7 +1,7 @@
 /*CODIGO SQL PROYECTO VOOWS*/
 
 /*Tablas*/
-CREATE TABLE Plan(
+CREATE TABLE Plan_(
     idp NUMBER(6) NOT NULL,
     estado VARCHAR2(5),
     fecha_inicio DATE
@@ -133,21 +133,21 @@ DROP TABLE Intercambio;
 DROP TABLE Chat;
 DROP TABLE Publicidad;
 DROP TABLE Genero;
-DROP TABLE Planes;
 DROP TABLE Grupo;
+DROP TABLE Libro;
+DROP TABLE Usuario;
 DROP TABLE Localizacion;
 DROP TABLE Plus;
 DROP TAblE Free;
-DROP TABLE Libro;
-DROP TABLE Usuario;
+DROP TABLE Plan_;
 
 
 /*Los usuarios en la tabla de intercambios deben ser diferentes*/
 
 
 /*Atributos*/
-ALTER TABLE Planes ADD CONSTRAINT CK_Planes_idp CHECK(idp >=0);
-ALTER TABLE Planes ADD CONSTRAINT CK_Planes_Booleano CHECK(estado = 'True' OR estado = 'False');
+ALTER TABLE Plan_ ADD CONSTRAINT CK_Planes_idp CHECK(idp >=0);
+ALTER TABLE Plan_ ADD CONSTRAINT CK_Planes_Booleano CHECK(estado = 'True' OR estado = 'False');
 
 ALTER TABLE Plus ADD CONSTRAINT CK_Plus_precio CHECK(precio = '15000' OR precio = '25000' OR precio = '150000');
 ALTER TABLE Plus ADD CONSTRAINT CK_Plus_medioPago CHECK(medio_pago = 'C' OR medio_pago = 'D' OR medio_pago = 'T');
@@ -206,7 +206,7 @@ ALTER TABLE Notificacion ADD CONSTRAINT CK_Notificacion_codigo CHECK (codigo_not
 ALTER TABLE Notificacion ADD CONSTRAINT CK_Notificacion_estado CHECK (estado = 'Solicitado' OR estado = 'En proceso' OR estado ='Entregado' OR estado = 'Cancelado' OR estado= 'Oculto');
 
 /*Primarias*/
-ALTER TABLE Planes ADD CONSTRAINT PK_Planes PRIMARY KEY (idp);
+ALTER TABLE Plan_ ADD CONSTRAINT PK_Planes PRIMARY KEY (idp);
 ALTER TABLE Plus ADD CONSTRAINT PK_Plus  PRIMARY KEY (idp_plan);
 ALTER TABLE Free ADD CONSTRAINT PK_Free PRIMARY KEY (idp_plan);
 ALTER TABLE Publicidad ADD CONSTRAINT PK_Publicidad PRIMARY KEY (idpu);
@@ -229,9 +229,9 @@ ALTER TABLE Libro ADD CONSTRAINT UK_Libro_titulo UNIQUE (titulo);
 
 /*Foraneas*/
 
-ALTER TABLE Plus ADD CONSTRAINT FK_Plus FOREIGN KEY (idp_plan) REFERENCES Planes(idp);
+ALTER TABLE Plus ADD CONSTRAINT FK_Plus FOREIGN KEY (idp_plan) REFERENCES Plan_(idp);
 
-ALTER TABLE Free ADD CONSTRAINT FK_Free FOREIGN KEY (idp_plan) REFERENCES Planes(idp);
+ALTER TABLE Free ADD CONSTRAINT FK_Free FOREIGN KEY (idp_plan) REFERENCES Plan_(idp);
 
 ALTER TABLE Publicidad ADD CONSTRAINT FK_Publicidad FOREIGN KEY (idp_plan) REFERENCES Free(idp_plan);
 
@@ -271,10 +271,8 @@ SELECT 'DROP SEQUENCE ' || sequence_name || ';' AS statement
 FROM user_sequences;
 
 
-/*Mantener notificaciones*/
-
-/*Ad*/
-/* el estado inicial de una notificacion es oculto*/
+--Mantener notificaciones:
+--Ad
 CREATE SEQUENCE secuencia_noti
   START WITH 100
   INCREMENT BY 1
@@ -299,17 +297,12 @@ BEGIN
     END IF;
 END; 
 /
-
-/*EL*/
-/*Solo se puede eliminar las notificaciones en "Oculto"*/
+--EL
 ALTER TABLE Notificacion DROP CONSTRAINT FK_Notificacion;
 ALTER TABLE Notificacion ADD CONSTRAINT FK_Notificacion FOREIGN KEY (id_inter) REFERENCES Intercambio(id_inter) ON DELETE CASCADE;
 
-/*Mantener libros*/
-
-/*Ad*/
-
-/*los libros  deben tener todos los datos, el comentario es opcional.*/
+--Mantener Libros:
+--Ad
 CREATE OR REPLACE TRIGGER TR_Libro_inicial
 BEFORE INSERT ON Libro
 FOR EACH ROW
@@ -319,7 +312,7 @@ BEGIN
     END IF;
 END; 
 /
-/*el estado de un libro se genera en abierto*/
+
 
 CREATE OR REPLACE TRIGGER TR_Libro_inicial_estado
 BEFORE INSERT ON Libro
@@ -332,10 +325,8 @@ BEGIN
     END IF;
 END;
 /
-/*Mo*/
+--Mo
 
-/*El estado se puede modificar de abierto 
-a cerrado si el libro esta en un proceso de intercambio.*/
 CREATE OR REPLACE TRIGGER TR_Libro_ModificarEstado
 BEFORE UPDATE ON Libro
 FOR EACH ROW
@@ -355,8 +346,7 @@ BEGIN
     END IF;
 END;
 /
-
-/*Solo se pueden eliminar libros que nunca tuvieron un proceso de intercambio*/
+--EL
 CREATE OR REPLACE TRIGGER TR_Libro_Eliminar_Libro
 BEFORE DELETE ON Libro
 FOR EACH ROW
@@ -370,9 +360,8 @@ BEGIN
 END;
 /
 
-/*Mantener intercambios*/
-
-/*Ad*/
+--Mantener intercambios:
+--Ad
 CREATE SEQUENCE secuencia_intercambio
   START WITH 1
   INCREMENT BY 1
@@ -383,7 +372,7 @@ CREATE SEQUENCE secuencia_intercambio
   ORDER;
 /
 
-/*los Libros solicitados deben estar disponibles y deben pertenecer a un usuario*/
+
 CREATE OR REPLACE TRIGGER TR_Intercambio_Libro_Disponible
 BEFORE INSERT ON Intercambio
 FOR EACH ROW
@@ -402,7 +391,7 @@ BEGIN
 END;
 /
 
-/*El id del intercambio se genera automaticamente y el numero de calificacion es null.*/
+
 CREATE OR REPLACE TRIGGER TR_Intercambio_Insert
 BEFORE INSERT ON Intercambio
 FOR EACH ROW
@@ -421,10 +410,7 @@ BEGIN
 END;
 /
 
-/*Mo*/
-
-/*El estado se puede modificar de "Solicitado" a  "Cancelado" y de "En proceso" a "Entregado".
-  -El estado puede pasar a "Oculto" una vez el estado este en "Cancelado" o "Entregado".*/
+--Mo
 CREATE OR REPLACE TRIGGER TR_Intercambio_ModEstado
 BEFORE UPDATE ON Intercambio
 FOR EACH ROW
@@ -443,7 +429,7 @@ BEGIN
     END IF;
 END;
 /
-/*Sólo se pueden modificar la calificacion una vez el intercambio sea entregado junto con su fecha de entrega.*/
+
 CREATE OR REPLACE TRIGGER TR_Intercambio_Calificacion
 BEFORE UPDATE ON Intercambio
 FOR EACH ROW
@@ -453,8 +439,8 @@ BEGIN
   END IF;
 END;
 /
+
 /*El*/
-/*-Solo se puede eliminar los intercambios con notificaciones ocultos*/
 CREATE OR REPLACE TRIGGER TR_Intercambio_Eliminar
 BEFORE DELETE ON Notificacion
 FOR EACH ROW
@@ -464,25 +450,171 @@ BEGIN
     END IF;
 END;
 /
-/*Crear un cascade en por si eliminan libros*/
 
-/*Mantener usuario*/
+ALTER TABLE Libro DROP CONSTRAINT FK_Libro;
 
-/*Ad/
+ALTER TABLE Libro
+ADD CONSTRAINT FK_Libro
+FOREIGN KEY (nombreUsuario)
+REFERENCES Usuario(nombreUsuario)
+ON DELETE CASCADE;
+
+--Mantener usuario:
+--Ad
+CREATE OR REPLACE TRIGGER TR_Usuario_Insert
+BEFORE INSERT ON Usuario
+FOR EACH ROW
+BEGIN
+    -- Verificar que el usuario pertenezca a un plan y tenga una localizacion
+    IF :new.id_free IS NULL AND :new.id_pluss IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20001, 'El usuario debe pertenecer a un plan.');
+    END IF;
+
+    IF :new.id_localizacion IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20002, 'El usuario debe tener una localización asignada.');
+    END IF;
+    :new.estado := 'A'; -- El estado del usuario inicia en "A" (Activo)
+    :new.fecha_conexion:=SYSDATE;
+END;
+/
+
+--Mo
+CREATE OR REPLACE TRIGGER TR_Usuario_Modificar
+BEFORE UPDATE ON Usuario
+FOR EACH ROW
+BEGIN
+    IF :new.id_free IS NOT NULL THEN
+        :new.id_pluss := null;
+    ELSIF :new.id_pluss IS NOT NULL THEN
+        :new.id_free := null;
+    END IF;
+END;
+/ 
+
+--El
+CREATE OR REPLACE TRIGGER TR_Usuario_Eliminar
+BEFORE  DELETE ON Usuario
+FOR EACH ROW
+DECLARE
+    intercambios_activos NUMBER(1);
+    es_organizador NUMBER(1);
+BEGIN
+    -- Verificar si el usuario es organizador de un grupo
+    SELECT COUNT(*) INTO es_organizador
+    FROM Grupo
+    WHERE organizador_grupo = :old.nombreUsuario;
+
+    IF es_organizador > 0 THEN
+        RAISE_APPLICATION_ERROR(-20004, 'No se puede eliminar el usuario mientras sea organizador de algún grupo.');
+    END IF;
+
+    -- Verificar si el usuario tiene intercambios activos
+    SELECT COUNT(*) INTO intercambios_activos
+    FROM Chat INNER JOIN Intercambio ON Chat.id_chat=Intercambio.id_chat
+    WHERE (Chat.usuario1 = :old.nombreUsuario OR chat.usuario2 = :old.nombreUsuario)
+    AND Intercambio.estado IN ('Solicitado', 'En proceso');
+
+    IF intercambios_activos > 0 THEN
+        RAISE_APPLICATION_ERROR(-20005, 'No se puede eliminar el usuario mientras tenga intercambios activos.');
+    END IF;
+    
+END;
+/
+
+--Mantener plan:
+--Ad
+CREATE SEQUENCE secuencia_planes
+  START WITH 100
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+/
+
+CREATE OR REPLACE TRIGGER TR_Plan_insert
+BEFORE INSERT ON Plan_
+FOR EACH ROW
+BEGIN
+    -- Todos los datos del plan son automaticos
+    :new.idp:=secuencia_planes.NEXTVAL;
+    :new.estado := 'true';
+    :new.fecha_inicio := SYSDATE;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_Plan_plus_insert
+BEFORE INSERT ON plus
+FOR EACH ROW
+BEGIN
+    -- Verificar que el metodo de pago no sea null
+    IF :new.medio_pago IS NULL THEN
+        RAISE_APPLICATION_ERROR(-20002, 'El metodo de pago no puede ser null para un plan plus.');
+    END IF;
+
+    IF :new.precio=15000 THEN
+        :new.cantidad_megustas:=50;
+        :new.fecha_de_fin:=ADD_MONTHS(SYSDATE, 1);
+    ELSIF :new.precio=25000 THEN
+        :new.cantidad_megustas:=150;
+        :new.fecha_de_fin:=ADD_MONTHS(SYSDATE, 3);
+    ELSIF :new.precio=150000 THEN
+        :new.cantidad_megustas:=500;
+        :new.fecha_de_fin:=ADD_MONTHS(SYSDATE, 12);
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_Plan_free_insert
+BEFORE INSERT ON Free
+FOR EACH ROW
+BEGIN
+    :new.cantidad_megustas:=10;
+END;
+/
+
+--Mo
+CREATE OR REPLACE TRIGGER TR_Plan_ModificarEstado
+BEFORE UPDATE ON Plan_
+FOR EACH ROW
+DECLARE
+    es_Usado NUMBER(1);
+BEGIN
+    SELECT COUNT(*) INTO es_Usado FROM Usuario WHERE id_free=:old.idp Or id_pluss=:old.idp;
+    IF es_Usado>0 THEN
+        RAISE_APPLICATION_ERROR(-20005, 'No se puede eliminar el plan mientras el usuario lo use.');
+    END IF;
+END;
+/
+--El
+CREATE Or REPLACE TRIGGER TR_Plan_ELiminar
+BEFORE DELETE ON Plan_
+FOR EACH ROW
+BEGIN
+    -- Verificar si el plan tiene estado en false antes de permitir su eliminacion
+    IF :old.estado LIKE 'false' THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Solo se pueden eliminar planes con estado en false.');
+    END IF;
+END;
+/
+
+
+
 
 /*VISTAS*/
 --Vista de usuarios con planes Plus
 CREATE VIEW usuarios_plus AS
 SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
 FROM Usuario u
-INNER JOIN Planes p ON u.id_pluss = p.idp
+INNER JOIN Plan_ ON u.id_pluss = p.idp
 INNER JOIN Plus pl ON p.idp = pl.idp_plan;
 
 --Vista de usuarios con planes Free
 CREATE VIEW usuarios_free AS
 SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
 FROM Usuario u
-INNER JOIN Planes p ON u.id_free = p.idp
+INNER JOIN Plan_ ON u.id_free = p.idp
 INNER JOIN Free f ON p.idp = f.idp_plan;
 
 --Vista de libros con su localizacion
@@ -937,9 +1069,9 @@ CREATE OR REPLACE PACKAGE BODY PC_USUARIO AS
     END;
 END PC_USUARIO;
 /
+
 --------------------------------------------------------------------------------------------------------
 /*Funciones*/
---Junta directiva
 --Mantener publicidad
 CREATE OR REPLACE TRIGGER mantener_publicidad
 BEFORE INSERT OR UPDATE OR DELETE ON Publicidad
@@ -968,84 +1100,6 @@ BEGIN
 END;
 /
 
---Usuario:
---Mantener libro
-CREATE TRIGGER mantener_libro
-BEFORE INSERT ON libros
-FOR EACH ROW
-BEGIN
-    DECLARE estado_anterior VARCHAR(10);
-    
-    IF NEW.estado = 'cerrado' THEN
-        SET estado_anterior = (
-            SELECT estado
-            FROM libros
-            WHERE id = NEW.id
-        );
-        
-        IF estado_anterior = 'abierto' THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'No se puede cambiar el estado de un libro de abierto a cerrado sin un proceso de intercambio.';
-        END IF;
-    END IF;
-    
-    IF NEW.estado = 'abierto' THEN
-        SET estado_anterior = (
-            SELECT estado
-            FROM libros
-            WHERE id = NEW.id
-        );
-        
-        IF estado_anterior = 'cerrado' THEN
-            SIGNAL SQLSTATE '45000'
-            SET MESSAGE_TEXT = 'No se puede cambiar el estado de un libro de cerrado a abierto si tuvo un proceso cancelado.';
-        END IF;
-    END IF;
-END;
-
---Mantener intercambios
-CREATE TRIGGER mantener_intercambios
-BEFORE INSERT ON intercambios
-FOR EACH ROW
-BEGIN
-    DECLARE disponibles1 INT;
-    DECLARE disponibles2 INT;
-    DECLARE libro_valido INT;
-    DECLARE usuario_valido INT;
-    
-    -- Verifica la disponibilidad de "cantidad_de_megustas" en ambos usuarios
-    SELECT cantidad_de_megustas INTO disponibles1
-    FROM usuarios
-    WHERE id = NEW.id_usuario1;
-    
-    SELECT cantidad_de_megustas INTO disponibles2
-    FROM usuarios
-    WHERE id = NEW.id_usuario2;
-    
-    IF disponibles1 >= NEW.cantidad_de_megustas AND disponibles2 >= NEW.cantidad_de_megustas THEN
-        -- Verifica si los libros solicitados estan disponibles y pertenecen a un usuario
-        SELECT COUNT(*) INTO libro_valido
-        FROM libros
-        WHERE id = NEW.id_libro1 AND id_usuario = NEW.id_usuario1 AND disponible = 1;
-        
-        SELECT COUNT(*) INTO libro_valido
-        FROM libros
-        WHERE id = NEW.id_libro2 AND id_usuario = NEW.id_usuario2 AND disponible = 1;
-        
-        IF libro_valido = 2 THEN
-            SET NEW.id_intercambio = UUID();  -- automatizacion del ID
-            
-            -- numero de calificacion como NULL y el estado como "Solicitado"
-            SET NEW.calificacion = NULL;
-            SET NEW.estado = 'Solicitado';
-            SET NEW.fecha = CURRENT_TIMESTAMP; --fecha actual como la fecha del intercambio
-        ELSE
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Los libros solicitados no están disponibles o no pertenecen a los usuarios';
-        END IF;
-    ELSE
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Los usuarios no tienen suficiente cantidad_de_megustas disponibles';
-    END IF;
-END;
 
 --Registrar evento
 CREATE TRIGGER validar_evento
@@ -1087,8 +1141,8 @@ BEGIN
     END IF;
 END;
 /
---Mantener chat
 
+--Mantener chat
 CREATE OR REPLACE TRIGGER mantener_chats
 BEFORE INSERT OR UPDATE OR DELETE ON Chat
 FOR EACH ROW
@@ -1126,7 +1180,6 @@ BEGIN
 END;
 /
 
---Servidor
 --Registrar Localizacion
 CREATE OR REPLACE TRIGGER registrar_localizacion
 BEFORE INSERT OR UPDATE OR DELETE ON Localizacion
@@ -1149,133 +1202,7 @@ BEGIN
     END IF;
 END;
 /
---Mantener notificaciones
-CREATE OR REPLACE TRIGGER mantener_notificaciones
-BEFORE INSERT OR UPDATE OR DELETE ON Intercambio
-FOR EACH ROW
-BEGIN
-    IF INSERTING THEN
-        INSERT INTO Notificacion(codigo_noti, id_inter, estado, descripcion, fecha)
-        VALUES(notificacion_sequence.NEXTVAL, :new.id_inter, :new.estado, NULL, SYSDATE);
-    ELSIF UPDATING('descripcion') THEN
-        -- No se permiten cambios en la descripcion de la notificacion
-        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar la descripción de la notificación.');
-    ELSIF DELETING THEN
-        -- Eliminar las notificaciones asociadas al intercambio que esta siendo eliminado
-        DELETE FROM Notificacion
-        WHERE id_inter = :old.id_inter;
-    END IF;
-END;
-/
---Mantener usuario
 
-CREATE OR REPLACE TRIGGER mantener_usuarios
-BEFORE INSERT OR UPDATE OR DELETE ON Usuario
-FOR EACH ROW
-DECLARE
-    intercambios_activos NUMBER(1);
-    es_organizador NUMBER(1);
-BEGIN
-    IF INSERTING THEN
-        -- Verificar que el usuario pertenezca a un plan y tenga una localizacion
-        IF :new.id_free IS NULL AND :new.id_pluss IS NULL THEN
-            RAISE_APPLICATION_ERROR(-20001, 'El usuario debe pertenecer a un plan.');
-        END IF;
-
-        IF :new.id_localizacion IS NULL THEN
-            RAISE_APPLICATION_ERROR(-20002, 'El usuario debe tener una localización asignada.');
-        END IF;
-        :new.estado := 'A'; -- El estado del usuario inicia en "A" (Activo)
-    END IF;
-
-    IF UPDATING('estado') THEN
-        -- Verificar si el usuario tiene intercambios activos
-        SELECT COUNT(*) INTO intercambios_activos
-        FROM Intercambio
-        WHERE (usuario1 = :new.nombreUsuario OR usuario2 = :new.nombreUsuario)
-        AND estado IN ('S', 'P');
-
-        IF intercambios_activos > 0 THEN
-            RAISE_APPLICATION_ERROR(-20003, 'No se puede modificar el estado del usuario mientras tenga intercambios activos.');
-        END IF;
-    END IF;
-
-    IF UPDATING('fecha_conexion') THEN
-        -- La fecha de conexion puede ser modificada
-    END IF;
-    IF UPDATING('contrasenia') THEN
-        -- La contrasena puede ser modificada
-    END IF;
-
-    IF DELETING THEN
-        -- Verificar si el usuario es organizador de un grupo
-        SELECT COUNT(*) INTO es_organizador
-        FROM Grupo
-        WHERE organizador = :old.nombreUsuario;
-
-        IF es_organizador > 0 THEN
-            RAISE_APPLICATION_ERROR(-20004, 'No se puede eliminar el usuario mientras sea organizador de algún grupo.');
-        END IF;
-
-        -- Verificar si el usuario tiene intercambios activos
-        SELECT COUNT(*) INTO intercambios_activos
-        FROM Intercambio
-        WHERE (usuario1 = :old.nombreUsuario OR usuario2 = :old.nombreUsuario)
-        AND estado IN ('S', 'P');
-
-        IF intercambios_activos > 0 THEN
-            RAISE_APPLICATION_ERROR(-20005, 'No se puede eliminar el usuario mientras tenga intercambios activos.');
-        END IF;
-    END IF;
-END;
-/
---Mantener plan
-CREATE OR REPLACE TRIGGER mantener_planes
-BEFORE INSERT OR UPDATE OR DELETE ON Planes
-FOR EACH ROW
-DECLARE
-    cantidad_megustas NUMBER(2);
-BEGIN
-    IF INSERTING THEN
-        -- Todos los datos del plan son automaticos
-        :new.estado := 'true';
-        :new.fecha_inicio := SYSDATE;
-    END IF;
-
-    IF UPDATING('estado') THEN
-        -- Verificar si el plan ya no pertenece a un usuario
-        IF :new.estado = 'false' THEN
-            -- Realizar las acciones correspondientes cuando el estado cambia a false
-        END IF;
-    END IF;
-
-    IF DELETING THEN
-        -- Verificar si el plan tiene estado en false antes de permitir su eliminacion
-        IF :old.estado <> 'false' THEN
-            RAISE_APPLICATION_ERROR(-20001, 'Solo se pueden eliminar planes con estado en false.');
-        END IF;
-    END IF;
-
-    -- Verificar condiciones adicionales para los planes plus
-    IF :new.estado = 'plus' THEN
-        -- Si es un plan plus, la cantidad de me gustas es dada por el precio
-        :new.cantidad_megustas := 
-
-        -- Verificar que el metodo de pago no sea null
-        IF :new.metodo_pago IS NULL THEN
-            RAISE_APPLICATION_ERROR(-20002, 'El metodo de pago no puede ser null para un plan plus.');
-        END IF;
-    END IF;
-
-    -- Verificar condiciones adicionales para los planes free
-    IF :new.estado = 'free' THEN
-        -- Si es un plan free, la cantidad de me gustas debe ser menor a 100
-        IF :new.cantidad_megustas >= 100 THEN
-            RAISE_APPLICATION_ERROR(-20003, 'La cantidad de me gustas para un plan free debe ser menor a 100.');
-        END IF;
-    END IF;
-END;
-/
 
 
 
