@@ -47,7 +47,7 @@ CREATE TABLE Archivo(
 );
 
 CREATE TABLE Genero(  
-    genero VARCHAR2(2)NOT NULL,
+    genero VARCHAR2(12) NOT NULL,
     titulo VARCHAR2(50),
     nombreUsuario VARCHAR2(16)
 );
@@ -360,6 +360,14 @@ BEGIN
 END;
 /
 
+ALTER TABLE Libro DROP CONSTRAINT FK_Libro;
+
+ALTER TABLE Libro
+ADD CONSTRAINT FK_Libro
+FOREIGN KEY (nombreUsuario)
+REFERENCES Usuario(nombreUsuario)
+ON DELETE CASCADE;
+
 --Mantener intercambios:
 --Ad
 CREATE SEQUENCE secuencia_intercambio
@@ -451,13 +459,6 @@ BEGIN
 END;
 /
 
-ALTER TABLE Libro DROP CONSTRAINT FK_Libro;
-
-ALTER TABLE Libro
-ADD CONSTRAINT FK_Libro
-FOREIGN KEY (nombreUsuario)
-REFERENCES Usuario(nombreUsuario)
-ON DELETE CASCADE;
 
 --Mantener usuario:
 --Ad
