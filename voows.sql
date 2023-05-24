@@ -394,7 +394,7 @@ BEGIN
     SELECT estado INTO disp1 FROM Libro WHERE titulo = :NEW.libro_inter1 AND estado = 'A' AND nombreUsuario = usuarioInter1;
     SELECT estado INTO disp2 FROM Libro WHERE titulo = :NEW.libro_inter2 AND estado = 'A'AND nombreUsuario = usuarioInter2;
     IF disp1 != 'true' OR disp2!='true' THEN
-        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE o Totulo del libro no existe');
+        RAISE_APPLICATION_ERROR(-20003,'No esta DISPONIBLE o Titulo del libro no existe');
     END IF;
 END;
 /
