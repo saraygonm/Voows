@@ -310,7 +310,7 @@ BEGIN
     If :NEW.autor = null OR :NEW.sinopsis = null OR :NEW.editorial = null OR :NEW.fecha_impresion = null THEN
         RAISE_APPLICATION_ERROR(-20002, 'Faltan datos obligatorios');
     END IF;
-END; 
+END;
 /
 
 
@@ -589,7 +589,7 @@ BEGIN
 END;
 /
 --El
-CREATE Or REPLACE TRIGGER TR_Plan_ELiminar
+CREATE OR REPLACE TRIGGER TR_Plan_ELiminar
 BEFORE DELETE ON Plan_
 FOR EACH ROW
 BEGIN
@@ -680,11 +680,10 @@ DROP VIEW intercambios_usuarios;
 create or replace PACKAGE PC_Intercambio AS
 PROCEDURE adicionar_Inter(in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_calificacion IN NUMBER, in_estado IN VARCHAR);
 PROCEDURE modificar_Inter(in_id_inter IN NUMBER, in_id_chat IN NUMBER,in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_fechaCreacion IN DATE, in_fechaEntrega IN DATE, in_calificacion IN NUMBER, in_estado IN VARCHAR);
-PROCEDURE eliminar_Inter(in_id_inter IN NUMBER,  in_id_chat IN NUMBER );
+PROCEDURE eliminar_Inter(in_id_inter IN NUMBER);
 PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR);
 END;
 /
-
 /*CRUDI*/
 CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
 --Procedimiento para adicionar un intercambio
@@ -774,7 +773,6 @@ END PC_Intercambio;
 /*CRUDE*/
 --implementacion del paquete correspondiente al CRUD Libros
 create or replace PACKAGE PC_Libro AS
-
 PROCEDURE adicionar_Libro(li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
 PROCEDURE modificar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER, li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
 PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER);
@@ -1085,13 +1083,6 @@ FOR EACH ROW
 DECLARE
     tiene_plan_pluss NUMBER(1);
 BEGIN
-    IF UPDATING THEN
-        -- No se permite la modificacion del ID de la publicidad
-        IF :new.idpu <> :old.idpu THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el ID de la publicidad.');
-        END IF;
-    END IF;
-
     IF DELETING THEN
         -- Verificar si el usuario tiene el plan pluss
         SELECT COUNT(*) INTO tiene_plan_pluss
@@ -1105,6 +1096,17 @@ BEGIN
     END IF;
 END;
 /
+CREATE OR REPLACE TRIGGER TR_Publicidad_ModificarId
+BEFORE UPDATE ON Publicidad
+FOR EACH ROW
+BEGIN
+    -- No se permite la modificacion del ID de la publicidad
+    IF :new.idpu <> :old.idpu THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el ID de la publicidad.');
+    END IF;
+END;
+/
+   
 
 
 --Registrar evento
