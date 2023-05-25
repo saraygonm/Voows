@@ -1204,6 +1204,98 @@ BEGIN
 END;
 /
 
+-------------------------------------------------------------------------------------------
+
+--Registrar evento:
+--Ad
+CREATE SEQUENCE seq_evento START WITH 1 INCREMENT BY 1; -- para definir un id que incremente automaticamente
+
+CREATE OR REPLACE TRIGGER TR_registrar_evento
+BEFORE INSERT ON Evento
+FOR EACH ROW
+BEGIN
+    If :NEW.nombre = null OR :NEW.proposito = null OR :NEW.fecha_inicio = null OR :NEW.fecha_finalizacion = null THEN
+        RAISE_APPLICATION_ERROR(-20002, 'Faltan datos obligatorios');
+    END IF;
+
+	IF INSERTING THEN
+		:new.id_evento := seq_evento.NEXTVAL;
+	END IF;
+
+	IF UPDATING THEN
+        -- No se permite la modificacion del ID de la publicidad
+		IF :new.id_evento <> :old.id_evento THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id del evento.');
+        END IF;
+        IF :new.id_grupo <> :old.id_grupo THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id Grupo del evento.');
+        END IF;
+		IF :new.nombre <> :old.nombre THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del evento.');
+        END IF;
+		IF :new.proposito <> :old.proposito THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Proposito del evento.');
+        END IF;
+		IF :new.asisten <> :old.asisten THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Asisten del evento.');
+        END IF;
+		IF :new.interesados <> :old.interesados THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Interesados del evento.');
+        END IF;
+	END IF;
+
+	IF DELETING THEN
+		IF getdate() < new.fecha_inicio THEN
+			RAISE_APPLICATION_ERROR(-20003, 'No se Se puede eliminar antes de la fecha de inicio.');
+		END IF;
+	END IF;
+
+END;
+
+
+
+--Mantener los grupos:
+CREATE OR REPLACE TRIGGER TR_registrar_grupos
+BEFORE INSERT ON Grupo
+FOR EACH ROW
+BEGIN
+	IF INSERTING THEN
+		DECLARE creador_grupo_usuario NUMBER(1);
+		SELECT COUNT(*) INTO creador_grupo_usuario
+		FROM usuario
+		WHERE nombre = :old.organizador_grupo
+		IF creador_grupo_usuario = 0 THEN
+			RAISE_APPLICATION_ERROR(-20003, 'Los grupos creados deben ser creados por un usuario.');
+		End;
+		IF :new.apodo = 0 THEN
+			:new.miembros := 1;
+		END IF;
+	END IF;
+
+	IF UPDATING THEN
+		IF :new.organizador_grupo <> :old.organizador_grupo and  :new.miembros <> :old.miembros  THEN
+			RAISE_APPLICATION_ERROR(-20003, 'El orgnizador es el unico que puede modificar los miembros.');
+		END IF;
+		IF :new.nombre <> :old.nombre THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del grupo.');
+        END IF;
+        IF :new.estado <> :old.estado THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Estado del grupo.');
+        END IF;
+		IF :new.miembros <> :old.miembros THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar los Miembros del evento.');
+        END IF;
+		IF :new.organizador_grupo <> :old.organizador_grupo THEN
+            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el organizador del grupo del evento.');
+        END IF;
+	END IF;
+
+	IF DELETING THEN
+		IF :new.organizador_grupo <> :old.organizador_grupo THEN
+			RAISE_APPLICATION_ERROR(-20003, 'El orgnizador es el unico que puede elminar el grupo.');
+		END IF;
+	END IF;
+END;
 
 
 
