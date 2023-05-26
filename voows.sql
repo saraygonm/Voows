@@ -270,7 +270,7 @@ FROM user_triggers;
 SELECT 'DROP SEQUENCE ' || sequence_name || ';' AS statement
 FROM user_sequences;
 
-
+/*FUNCIONES*/
 --Mantener notificaciones:
 --Ad
 CREATE SEQUENCE secuencia_noti
@@ -297,6 +297,18 @@ BEGIN
     END IF;
 END; 
 /
+--MO
+CREATE OR REPLACE TRIGGER TR_modifi_descripcion
+BEFORE UPDATE ON Notificacion
+FOR EACH ROW
+BEGIN
+    IF UPDATING('descripcion') THEN
+        NULL; -- Permite la modificacion de la descripcion
+    ELSE
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar ningún campo excepto la descripción.');
+    END IF;
+END;
+/
 --EL
 ALTER TABLE Notificacion DROP CONSTRAINT FK_Notificacion;
 ALTER TABLE Notificacion ADD CONSTRAINT FK_Notificacion FOREIGN KEY (id_inter) REFERENCES Intercambio(id_inter) ON DELETE CASCADE;
@@ -310,7 +322,7 @@ BEGIN
     If :NEW.autor = null OR :NEW.sinopsis = null OR :NEW.editorial = null OR :NEW.fecha_impresion = null THEN
         RAISE_APPLICATION_ERROR(-20002, 'Faltan datos obligatorios');
     END IF;
-END;
+END; 
 /
 
 
@@ -589,7 +601,7 @@ BEGIN
 END;
 /
 --El
-CREATE OR REPLACE TRIGGER TR_Plan_ELiminar
+CREATE Or REPLACE TRIGGER TR_Plan_ELiminar
 BEFORE DELETE ON Plan_
 FOR EACH ROW
 BEGIN
@@ -599,8 +611,405 @@ BEGIN
     END IF;
 END;
 /
+--------------------------------------------------------------------------------------------------------
+
+--Mantener Archivos
+--Ad
+CREATE OR REPLACE TRIGGER TR_validar_tipo_imagen
+BEFORE INSERT OR UPDATE ON Archivo
+FOR EACH ROW
+DECLARE
+    tipo_valido EXCEPTION;
+    tipo_archivo VARCHAR2(3);
+BEGIN
+    tipo_archivo := UPPER(:NEW.tipo);
+    IF tipo_archivo NOT IN ('JPG', 'GIF', 'BMP', 'PNG') THEN -- tipo valido
+        RAISE tipo_valido;
+    END IF; 
+EXCEPTION
+    WHEN tipo_valido THEN
+        raise_application_error(-20001, 'Solo se permiten tipos de imagen: JPG, GIF, BMP, PNG');
+END;
+/
+
+create or replace TRIGGER TR_validar_URL
+BEFORE INSERT ON Archivo
+FOR EACH ROW
+DECLARE
+    url_pattern VARCHAR2(100) := '^https://dominio.extension/nombreArchivo.pdf$';
+BEGIN
+    IF :NEW.URRL IS NOT NULL AND REGEXP_LIKE(:NEW.URRL, url_pattern) = FALSE THEN
+        RAISE_APPLICATION_ERROR(-20001, 'La URL no cumple con la estructura requerida.');
+    END IF;
+END;
+/
+--Mo
+CREATE OR REPLACE TRIGGER TR_limite_modificaciones
+BEFORE UPDATE OF URRL, tipo ON Archivo
+FOR EACH ROW
+DECLARE
+    contador NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO contador --Numero de modificaciones
+    FROM Archivo
+    WHERE codigo = :NEW.codigo
+    AND (URRL <> :NEW.URRL OR tipo <> :NEW.tipo);
+    IF contador >= 2 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se pueden realizar mas de dos modificaciones en la URL o el tipo.');
+    END IF;
+END;
+/
+
+--EL:
+CREATE OR REPLACE TRIGGER TR_eliminar_archivo
+BEFORE DELETE ON Archivo
+FOR EACH ROW
+DECLARE
+    tiene_intercambio NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO tiene_intercambio --Archivos con procesos asociados
+    FROM Intercambio
+    WHERE libro_inter1 = :OLD.titulo OR libro_inter2 = :OLD.titulo;
+    IF tiene_intercambio = 0 THEN
+        NULL;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar el archivo porque tiene procesos de intercambio asociados.');
+    END IF;
+END;
+/
+
+--Registrar evento
+CREATE TRIGGER validar_evento
+
+/*AD:
+CREATE SEQUENCE secuencia_evento START WITH 1 INCREMENT BY 1;
+CREATE OR REPLACE TRIGGER TR_generarid
+BEFORE INSERT ON Evento
+FOR EACH ROW
+BEGIN
+  SELECT secuencia_evento.NEXTVAL INTO :NEW.id_evento FROM DUAL;
+END;
+*/
+
+CREATE OR REPLACE TRIGGER TR_CamposRequeridos_evento
+BEFORE INSERT OR UPDATE ON Evento
+FOR EACH ROW
+DECLARE
+BEGIN
+  IF :new.nombre IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20001, 'El campo "nombre" es obligatorio.');
+  END IF;
+  
+  IF :new.proposito IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20002, 'El campo "propósito" es obligatorio.');
+  END IF;
+  
+  IF :new.fecha_inicio IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20003, 'El campo "fecha de inicio" es obligatorio.');
+  END IF;
+  
+  IF :new.fecha_finalizacion IS NULL THEN
+    RAISE_APPLICATION_ERROR(-20004, 'El campo "fecha de finalización" es obligatorio.');
+  END IF;
+END;
+/
+
+--MO:
+CREATE OR REPLACE TRIGGER TR_mod_localizacionYhorarios
+BEFORE UPDATE ON Evento
+FOR EACH ROW
+DECLARE
+BEGIN
+    IF UPDATING THEN
+            -- No se permite la modificacion del ID de la publicidad
+            IF :new.id_evento <> :old.id_evento THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id del evento.');
+            END IF;
+            IF :new.id_grupo <> :old.id_grupo THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id Grupo del evento.');
+            END IF;
+            IF :new.nombre <> :old.nombre THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del evento.');
+            END IF;
+            IF :new.proposito <> :old.proposito THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Proposito del evento.');
+            END IF;
+            IF :new.asisten <> :old.asisten THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Asisten del evento.');
+            END IF;
+            IF :new.interesados <> :old.interesados THEN
+                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Interesados del evento.');
+            END IF;
+    END IF;
+END;
+/
+
+--EL:
+
+CREATE OR REPLACE TRIGGER TR_eliminar_evento
+BEFORE DELETE ON Evento
+FOR EACH ROW
+DECLARE
+    fecha_actual DATE := SYSDATE;
+BEGIN
+    IF :OLD.fecha_inicio <= fecha_actual THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar un evento después de su fecha de inicio.');
+    END IF;
+END;
+/
+
+--Mantener Grupos
+--AD
+CREATE OR REPLACE TRIGGER TR_grupo_usuario
+BEFORE INSERT ON Grupo
+FOR EACH ROW
+DECLARE
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count --el organizador existe en la tabla usuario
+    FROM Usuario
+    WHERE nombreUsuario = :NEW.organizador_grupo;
+    IF v_count = 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'El usuario organizador no existe');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_miembrosenUno
+BEFORE INSERT ON Grupo
+FOR EACH ROW
+BEGIN
+    IF :NEW.miembros IS NULL THEN
+        :NEW.miembros := 1;
+    END IF;
+END;
+/
+--MO
+CREATE OR REPLACE TRIGGER TR_mod_grupo
+BEFORE UPDATE ON Grupo
+FOR EACH ROW
+BEGIN
+  IF UPDATING('nombre') OR UPDATING('estado') OR UPDATING('organizador_grupo') THEN
+    RAISE_APPLICATION_ERROR(-20001, 'No se pueden modificar los campos nombre, estado y organizador_grupo.');
+  END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_actualizar_miembros
+AFTER INSERT OR UPDATE OR DELETE ON Grupo
+FOR EACH ROW
+BEGIN
+    IF INSERTING THEN
+        UPDATE Grupo
+        SET miembros = miembros + 1
+        WHERE nombre = :NEW.nombre;
+    ELSIF UPDATING THEN
+        UPDATE Grupo
+        SET miembros = miembros + (:NEW.miembros - :OLD.miembros)
+        WHERE nombre = :NEW.nombre;
+    ELSIF DELETING THEN
+        UPDATE Grupo
+        SET miembros = miembros - 1
+        WHERE nombre = :OLD.nombre;
+    END IF;
+END;
+/
+
+--EL
+CREATE OR REPLACE TRIGGER TR_eliminar_grupo
+BEFORE DELETE ON Grupo
+FOR EACH ROW
+DECLARE
+    v_organizador VARCHAR2(50);
+BEGIN
+    SELECT organizador_grupo INTO v_organizador
+    FROM Grupo
+    WHERE nombre = :OLD.nombre;
+
+    IF v_organizador <> USER THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Solo el organizador puede eliminar el grupo.');
+    END IF;
+END;
+/
+CREATE OR REPLACE TRIGGER TR_eliminar_miembro
+BEFORE DELETE ON Grupo
+FOR EACH ROW
+DECLARE
+    v_organizador VARCHAR2(50);
+BEGIN
+    SELECT organizador_grupo INTO v_organizador FROM Grupo WHERE nombre = :old.nombre; --Organizador del grupo
+    IF v_organizador = USER THEN
+        UPDATE Grupo SET miembros = miembros - 1 WHERE nombre = :old.nombre;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20001, 'Solo el organizador puede eliminar miembros del grupo.');
+    END IF;
+END;
+/
+
+--Mantener chat
+--AD
+CREATE OR REPLACE TRIGGER TR_Chat_unicoUsuario
+BEFORE INSERT ON Chat
+FOR EACH ROW
+DECLARE
+    v_count NUMBER;
+BEGIN
+    -- Verificar si el chat solo tiene un usuario
+    IF :NEW.usuario1 = :NEW.usuario2 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No puedes crear un chat donde solo estés tú.');
+    END IF;
+END;
+/
+
+CREATE OR REPLACE TRIGGER TR_generar_apodo
+BEFORE INSERT ON Chat
+FOR EACH ROW
+BEGIN
+    IF :NEW.apodo IS NULL OR :NEW.apodo = '' THEN
+        SELECT 'Chat' || u.nombre INTO :NEW.apodo
+        FROM Usuario u
+        WHERE u.nombreUsuario = :NEW.usuario1;
+    END IF;
+END;
+/
+--MO
+create or replace TRIGGER TR_modificar_apodo
+BEFORE UPDATE OF apodo ON Chat
+FOR EACH ROW
+BEGIN
+    IF :NEW.apodo <> :OLD.apodo THEN
+        DBMS_OUTPUT.PUT_LINE('Se ha modificado el apodo del chat.');
+    END IF;
+END;
+/
+--EL
+CREATE OR REPLACE TRIGGER TR_eliminar_chat
+BEFORE DELETE ON Chat
+FOR EACH ROW
+DECLARE
+    total_intercambios NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO total_intercambios
+    FROM Intercambio
+    WHERE id_chat = :OLD.id_chat
+      AND estado = 'P';
+    IF total_intercambios = 0 THEN
+        NULL;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar el chat mientras haya intercambios en proceso.');
+    END IF;
+END;
+/
 
 
+--Registrar Localizacion
+/*
+CREATE OR REPLACE FUNCTION obtener_ubicacion_actual
+    RETURN SYS_REFCURSOR
+IS
+    v_latitud NUMBER(10,8);
+    v_longitud NUMBER(10,8);
+    v_cur SYS_REFCURSOR;
+BEGIN
+    -- Generar valores aleatorios de latitud y longitud 
+    v_latitud := DBMS_RANDOM.VALUE(-90, 90);
+    v_longitud := DBMS_RANDOM.VALUE(-180, 180);
+
+    OPEN v_cur FOR
+        SELECT v_latitud AS latitud, v_longitud AS longitud
+        FROM DUAL;
+
+    RETURN v_cur;
+END;
+/
+CREATE OR REPLACE TRIGGER TR_actualizar_localizacion
+AFTER INSERT OR UPDATE ON Usuario
+FOR EACH ROW
+DECLARE
+    v_latitud NUMBER(10,8);
+    v_longitud NUMBER(10,8);
+BEGIN
+    SELECT latitud, longitud INTO v_latitud, v_longitud --Ubi del usuario
+    FROM obtener_ubicacion_actual();
+    UPDATE Localizacion
+    SET latitud = v_latitud, longitud = v_longitud
+    WHERE id_localizacion = :NEW.id_localizacion;
+END;
+*/
+--MO
+CREATE OR REPLACE TRIGGER TR_modificar_localizacion
+BEFORE UPDATE ON Localizacion
+FOR EACH ROW
+BEGIN
+    IF :NEW.latitud != :OLD.latitud OR :NEW.longitud != :OLD.longitud THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se permite modificar la localizacion.');
+    END IF;
+END;
+/
+
+--EL
+CREATE OR REPLACE TRIGGER TR_eliminar_localizacion
+BEFORE DELETE ON Localizacion
+FOR EACH ROW
+DECLARE
+    contador NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO contador
+    FROM Usuario
+    WHERE id_localizacion = :OLD.id_localizacion;
+    
+    IF contador = 0 THEN
+        DELETE FROM Localizacion
+        WHERE id_localizacion = :OLD.id_localizacion;
+    END IF;
+END;
+/
+
+--Mantener publicidad
+--AD
+create or replace TRIGGER TR_AdicionarPlanFree
+AFTER INSERT ON Plan_
+FOR EACH ROW
+DECLARE
+    v_idp_plan NUMBER(6);
+BEGIN
+    IF :NEW.estado = 'free' THEN
+        SELECT NVL(MAX(idp_plan), 0) + 1 INTO v_idp_plan FROM Free;
+        -- Insertar una nueva fila en la tabla Free
+        INSERT INTO Free (idp_plan, cantidad_megustas)
+        VALUES (v_idp_plan, 0);
+    END IF;
+END;
+*/
+
+--MO
+create or replace TRIGGER TR_descripcion_publicidad
+BEFORE UPDATE ON Publicidad
+FOR EACH ROW
+BEGIN
+    IF :OLD.descripcion <> :NEW.descripcion THEN
+        DBMS_OUTPUT.PUT_LINE('La descripción de la publicidad ha sido modificada.');
+    END IF;
+END;
+
+--EL
+create or replace TRIGGER TR_eliminar_publicidad
+BEFORE DELETE ON Publicidad
+FOR EACH ROW
+DECLARE
+    v_estado_plan VARCHAR2(5);
+BEGIN
+    SELECT estado INTO v_estado_plan
+    FROM Plan_
+    WHERE idp = :OLD.idp_plan;
+    IF v_estado_plan = 'false' THEN
+        NULL;
+    ELSE
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar la publicidad para planes no cancelados.');
+    END IF;
+END;
+
+-----------------------------------------------------------------------------------------
 
 
 /*VISTAS*/
@@ -1074,235 +1483,7 @@ CREATE OR REPLACE PACKAGE BODY PC_USUARIO AS
 END PC_USUARIO;
 /
 
---------------------------------------------------------------------------------------------------------
-/*Funciones*/
---Mantener publicidad
-CREATE OR REPLACE TRIGGER mantener_publicidad
-BEFORE INSERT OR UPDATE OR DELETE ON Publicidad
-FOR EACH ROW
-DECLARE
-    tiene_plan_pluss NUMBER(1);
-BEGIN
-    IF DELETING THEN
-        -- Verificar si el usuario tiene el plan pluss
-        SELECT COUNT(*) INTO tiene_plan_pluss
-        FROM Usuario
-        WHERE idp_plan = :old.idp_plan
-        AND id_pluss IS NOT NULL;
 
-        IF tiene_plan_pluss = 0 THEN
-            RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar la publicidad para usuarios sin el plan pluss.');
-        END IF;
-    END IF;
-END;
-/
-CREATE OR REPLACE TRIGGER TR_Publicidad_ModificarId
-BEFORE UPDATE ON Publicidad
-FOR EACH ROW
-BEGIN
-    -- No se permite la modificacion del ID de la publicidad
-    IF :new.idpu <> :old.idpu THEN
-        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el ID de la publicidad.');
-    END IF;
-END;
-/
-   
-
-
---Registrar evento
-CREATE TRIGGER validar_evento
-BEFORE INSERT ON eventos
-FOR EACH ROW
-BEGIN
-    IF NEW.nombre_evento IS NULL OR NEW.proposito IS NULL OR NEW.fecha_inicio IS NULL OR NEW.fecha_fin IS NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Todos los campos obligatorios deben ser proporcionados.';
-    END IF;
-    
-    IF NEW.fecha_inicio >= NEW.fecha_fin THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'La fecha de inicio debe ser anterior a la fecha de finalización.';
-    END IF;
-END;
-
---Mantener Grupos
-CREATE OR REPLACE TRIGGER mantener_grupos
-BEFORE INSERT OR UPDATE ON Grupo
-FOR EACH ROW
-DECLARE
-    v_usuario VARCHAR2(50);
-BEGIN
-    -- Obtener el usuario actual
-    SELECT USER INTO v_usuario FROM dual;
-
-    -- Verificar si se esta insertando un nuevo grupo
-    IF INSERTING THEN
-        :NEW.organizador_grupo := v_usuario;
-        :NEW.estado := 'A'; -- estado del grupo como "activo"
-    END IF;
-
-    IF UPDATING('miembros') THEN
-        :NEW.miembros := :NEW.miembros;
-    END IF;
-    IF UPDATING('organizador_grupo') THEN
-        IF :NEW.organizador_grupo <> v_usuario THEN -- Restringir la actualizacion del organizador al usuario actual
-            RAISE_APPLICATION_ERROR(-20001, 'No tienes permiso para cambiar el organizador del grupo.');
-        END IF;
-    END IF;
-END;
-/
-
---Mantener chat
-CREATE OR REPLACE TRIGGER mantener_chats
-BEFORE INSERT OR UPDATE OR DELETE ON Chat
-FOR EACH ROW
-DECLARE
-    intercambios_en_proceso NUMBER(1);
-BEGIN
-    IF INSERTING THEN
-        -- Verificar que el chat no sea creado solo con un usuario
-        IF :new.usuario1 = :new.usuario2 THEN
-            RAISE_APPLICATION_ERROR(-20001, 'El chat debe incluir a dos usuarios diferentes.');
-        END IF;
-
-        -- Generar el apodo del chat si no se proporciona
-        IF :new.apodo IS NULL THEN
-            :new.apodo := 'Chat ' || :new.usuario1 || ' ' || :new.usuario2;
-        END IF;
-    END IF;
-
-    IF UPDATING('apodo') THEN
-        -- No se permiten cambios en el apodo del chat
-        RAISE_APPLICATION_ERROR(-20002, 'No se puede modificar el apodo del chat.');
-    END IF;
-
-    IF DELETING THEN
-        -- Verificar si hay intercambios en proceso relacionados con el chat
-        SELECT COUNT(*) INTO intercambios_en_proceso
-        FROM Intercambio
-        WHERE id_chat = :old.id_chat
-        AND estado = 'P';
-
-        IF intercambios_en_proceso > 0 THEN
-            RAISE_APPLICATION_ERROR(-20003, 'No se puede eliminar el chat mientras haya intercambios en proceso.');
-        END IF;
-    END IF;
-END;
-/
-
---Registrar Localizacion
-CREATE OR REPLACE TRIGGER registrar_localizacion
-BEFORE INSERT OR UPDATE OR DELETE ON Localizacion
-FOR EACH ROW
-BEGIN
-    IF INSERTING THEN
-        -- Generar automaticamente la localizacion usando la ubicacion actual del usuario
-        :new.latitud := obtener_latitud();
-        :new.longitud := obtener_longitud();
-    END IF;
-
-    IF UPDATING('latitud') OR UPDATING('longitud') THEN
-        -- No se permite modificar la localizacion
-        RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar la localización.');
-    END IF;
-
-    IF DELETING THEN
-        -- No se permite eliminar la localizacion
-        RAISE_APPLICATION_ERROR(-20002, 'No se puede eliminar la localización.');
-    END IF;
-END;
-/
-
--------------------------------------------------------------------------------------------
-
---Registrar evento:
---Ad
-CREATE SEQUENCE seq_evento START WITH 1 INCREMENT BY 1; -- para definir un id que incremente automaticamente
-
-CREATE OR REPLACE TRIGGER TR_registrar_evento
-BEFORE INSERT ON Evento
-FOR EACH ROW
-BEGIN
-    If :NEW.nombre = null OR :NEW.proposito = null OR :NEW.fecha_inicio = null OR :NEW.fecha_finalizacion = null THEN
-        RAISE_APPLICATION_ERROR(-20002, 'Faltan datos obligatorios');
-    END IF;
-
-	IF INSERTING THEN
-		:new.id_evento := seq_evento.NEXTVAL;
-	END IF;
-
-	IF UPDATING THEN
-        -- No se permite la modificacion del ID de la publicidad
-		IF :new.id_evento <> :old.id_evento THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id del evento.');
-        END IF;
-        IF :new.id_grupo <> :old.id_grupo THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id Grupo del evento.');
-        END IF;
-		IF :new.nombre <> :old.nombre THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del evento.');
-        END IF;
-		IF :new.proposito <> :old.proposito THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Proposito del evento.');
-        END IF;
-		IF :new.asisten <> :old.asisten THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Asisten del evento.');
-        END IF;
-		IF :new.interesados <> :old.interesados THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Interesados del evento.');
-        END IF;
-	END IF;
-
-	IF DELETING THEN
-		IF getdate() < new.fecha_inicio THEN
-			RAISE_APPLICATION_ERROR(-20003, 'No se Se puede eliminar antes de la fecha de inicio.');
-		END IF;
-	END IF;
-
-END;
-
-
-
---Mantener los grupos:
-CREATE OR REPLACE TRIGGER TR_registrar_grupos
-BEFORE INSERT ON Grupo
-FOR EACH ROW
-BEGIN
-	IF INSERTING THEN
-		DECLARE creador_grupo_usuario NUMBER(1);
-		SELECT COUNT(*) INTO creador_grupo_usuario
-		FROM usuario
-		WHERE nombre = :old.organizador_grupo
-		IF creador_grupo_usuario = 0 THEN
-			RAISE_APPLICATION_ERROR(-20003, 'Los grupos creados deben ser creados por un usuario.');
-		End;
-		IF :new.apodo = 0 THEN
-			:new.miembros := 1;
-		END IF;
-	END IF;
-
-	IF UPDATING THEN
-		IF :new.organizador_grupo <> :old.organizador_grupo and  :new.miembros <> :old.miembros  THEN
-			RAISE_APPLICATION_ERROR(-20003, 'El orgnizador es el unico que puede modificar los miembros.');
-		END IF;
-		IF :new.nombre <> :old.nombre THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del grupo.');
-        END IF;
-        IF :new.estado <> :old.estado THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Estado del grupo.');
-        END IF;
-		IF :new.miembros <> :old.miembros THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar los Miembros del evento.');
-        END IF;
-		IF :new.organizador_grupo <> :old.organizador_grupo THEN
-            RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el organizador del grupo del evento.');
-        END IF;
-	END IF;
-
-	IF DELETING THEN
-		IF :new.organizador_grupo <> :old.organizador_grupo THEN
-			RAISE_APPLICATION_ERROR(-20003, 'El orgnizador es el unico que puede elminar el grupo.');
-		END IF;
-	END IF;
-END;
 
 
 
