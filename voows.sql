@@ -1011,18 +1011,25 @@ END;
 
 -----------------------------------------------------------------------------------------
 
+-----------------------------------------------------------------------------------------
 
 /*VISTAS*/
 
 --Vista de libros de otro usuario que esten disponibles
-CREATE VIEW VistaLibrosDisponibles AS
+CREATE VIEW Vista_Libros_Disponibles AS
 SELECT l.nombreUsuario, l.titulo, l.autor, l.sinopsis, l.editorial, l.comentario, l.fecha_impresion
 FROM Libro l
 JOIN Usuario u ON l.nombreUsuario = u.nombreUsuario
 WHERE l.estado = 'A';
 
+--Vista del lugar del evento
+CREATE VIEW Vista_Lugar_Evento AS
+SELECT e.asisten, e.fecha_inicio, e.fecha_finalizacion, e.proposito, e.nombre, e.id_localizacion, l.latitud, l.longitud
+FROM Evento e
+INNER JOIN Localizacion l ON e.id_localizacion = l.id_localizacion;
+
 --Vista de los planes para el usuario
-CREATE VIEW Vista_Planes AS
+CREATE VIEW Vista_Planes_usuario AS
 SELECT p.idp, p.estado, p.fecha_inicio, 'Plus' AS tipo_plan, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
 FROM Plan_ p
 JOIN Plus pl ON p.idp = pl.idp_plan
@@ -1031,38 +1038,19 @@ SELECT p.idp, p.estado, p.fecha_inicio, 'Free' AS tipo_plan, f.cantidad_megustas
 FROM Plan_ p
 JOIN Free f ON p.idp = f.idp_plan;
 
---Vista de usuarios con planes Plus
-CREATE VIEW usuarios_plus AS
-SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
-FROM Usuario u
-INNER JOIN Plan_ ON u.id_pluss = p.idp
-INNER JOIN Plus pl ON p.idp = pl.idp_plan;
-
---Vista de usuarios con planes Free
-CREATE VIEW usuarios_free AS
-SELECT u.nombreUsuario, u.nombre, p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
-FROM Usuario u
-INNER JOIN Plan_ ON u.id_free = p.idp
-INNER JOIN Free f ON p.idp = f.idp_plan;
 
 --Vista de libros con su localizacion
-CREATE VIEW VistaLibrosConLocalizacion AS
+CREATE VIEW Vista_Libros_Localizacion AS
 SELECT l.nombreUsuario, l.titulo, l.autor, l.sinopsis, l.editorial, l.comentario, l.fecha_impresion, l.estado, loc.latitud, loc.longitud
 FROM Libro l
 JOIN Localizacion loc ON l.nombreUsuario = loc.id_localizacion;
 
 --Vistas de eventos con su localizacion
-CREATE VIEW eventos_localizacion AS
+CREATE VIEW Vista_eventos_localizacion AS
 SELECT e.id_evento, e.id_grupo, e.nombre, e.proposito, e.fecha_inicio, e.fecha_finalizacion, loc.id_localizacion, loc.latitud, loc.longitud
 FROM Evento e
 LEFT JOIN Localizacion loc ON e.id_localizacion = loc.id_localizacion;
 
---Vista de los grupos creados por un usuario 
-CREATE VIEW GruposPorUsuario AS
-SELECT g.nombre AS nombre_grupo, g.miembros
-FROM Grupo g
-JOIN Usuario u ON g.organizador_grupo = u.nombreUsuario
-ORDER BY g.miembros DESC; --ordenados de menor a mayor segun los miembros
 
 --Vista de intercambios de libros con informacion de los usuarios
 CREATE VIEW intercambios_usuarios AS
@@ -1075,14 +1063,14 @@ INNER JOIN Usuario u2 ON i.usuario2 = u2.nombreUsuario;
 
 
 /*XIndicesVistas*/
-DROP VIEW VistaLibrosDisponibles;
-DROP VIEW Vista_Planes;
-DROP VIEW usuarios_plus;
-DROP VIEW usuarios_free;
-DROP VIEW VistaLibrosConLocalizacion;
-DROP VIEW eventos_localizacion;
-DROP VIEW GruposPorUsuario;
+DROP VIEW Vista_Libros_Disponibles;
+DROP VIEW Vista_Lugar_Evento;
+DROP VIEW Vista_Planes_usuario;
+DROP VIEW Vista_Libros_Localizacion;
+DROP VIEW Vista_eventos_localizacion;
 DROP VIEW intercambios_usuarios;
+
+
 
 /*CRUDE*/
 --implementacion del paquete correspondiente al CRUD Intercambio
