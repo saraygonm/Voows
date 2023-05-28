@@ -615,6 +615,8 @@ END;
 
 --Mantener Archivos
 --Ad
+--codigo es autogenerado y no esta
+
 CREATE OR REPLACE TRIGGER TR_validar_tipo_imagen
 BEFORE INSERT OR UPDATE ON Archivo
 FOR EACH ROW
@@ -622,11 +624,14 @@ DECLARE
     tipo_valido EXCEPTION;
     tipo_archivo VARCHAR2(3);
 BEGIN
+    --???????????????? La integridad ya esta programada en atributos !!!!
     tipo_archivo := UPPER(:NEW.tipo);
     IF tipo_archivo NOT IN ('JPG', 'GIF', 'BMP', 'PNG') THEN -- tipo valido
         RAISE tipo_valido;
-    END IF; 
-EXCEPTION
+    END IF;
+    --Que hace una exception en un trigger ??? Para eso es el trigger, el trigger es la excepcion
+exception
+    --??
     WHEN tipo_valido THEN
         raise_application_error(-20001, 'Solo se permiten tipos de imagen: JPG, GIF, BMP, PNG');
 END;
@@ -638,6 +643,7 @@ FOR EACH ROW
 DECLARE
     url_pattern VARCHAR2(100) := '^https://dominio.extension/nombreArchivo.pdf$';
 BEGIN
+    --Otra vezv validado cosas que ya estan hechas .-.
     IF :NEW.URRL IS NOT NULL AND REGEXP_LIKE(:NEW.URRL, url_pattern) = FALSE THEN
         RAISE_APPLICATION_ERROR(-20001, 'La URL no cumple con la estructura requerida.');
     END IF;
@@ -645,6 +651,7 @@ END;
 /
 --Mo
 CREATE OR REPLACE TRIGGER TR_limite_modificaciones
+--Ni tu entiendes que hace esto .-.
 BEFORE UPDATE OF URRL, tipo ON Archivo
 FOR EACH ROW
 DECLARE
@@ -661,6 +668,8 @@ END;
 /
 
 --EL:
+---Solo se tenia que hacer que los archivos se eliminaran en cascade
+--Cuando se elimina libros.
 CREATE OR REPLACE TRIGGER TR_eliminar_archivo
 BEFORE DELETE ON Archivo
 FOR EACH ROW
@@ -681,8 +690,9 @@ END;
 --Registrar evento
 CREATE TRIGGER validar_evento
 
-/*AD:
-CREATE SEQUENCE secuencia_evento START WITH 1 INCREMENT BY 1;
+--Ad
+
+/*CREATE SEQUENCE secuencia_evento START WITH 1 INCREMENT BY 1;
 CREATE OR REPLACE TRIGGER TR_generarid
 BEFORE INSERT ON Evento
 FOR EACH ROW
@@ -703,7 +713,7 @@ BEGIN
   IF :new.proposito IS NULL THEN
     RAISE_APPLICATION_ERROR(-20002, 'El campo "propósito" es obligatorio.');
   END IF;
-  
+  --Aqui se puede verificar que la fecha de inicio sea menor a la fecha de fin.
   IF :new.fecha_inicio IS NULL THEN
     RAISE_APPLICATION_ERROR(-20003, 'El campo "fecha de inicio" es obligatorio.');
   END IF;
@@ -720,6 +730,7 @@ BEFORE UPDATE ON Evento
 FOR EACH ROW
 DECLARE
 BEGIN
+    --????????? Nadie va actualizar eso ya que eso se bloquea en seguridad
     IF UPDATING THEN
             -- No se permite la modificacion del ID de la publicidad
             IF :new.id_evento <> :old.id_evento THEN
@@ -772,6 +783,7 @@ BEGIN
     IF v_count = 0 THEN
         RAISE_APPLICATION_ERROR(-20001, 'El usuario organizador no existe');
     END IF;
+    :NEW.miembros := 1;
 END;
 /
 
@@ -795,28 +807,18 @@ BEGIN
 END;
 /
 
+
 CREATE OR REPLACE TRIGGER TR_actualizar_miembros
-AFTER INSERT OR UPDATE OR DELETE ON Grupo
+BEFORE UPDATE ON Grupo
 FOR EACH ROW
 BEGIN
-    IF INSERTING THEN
-        UPDATE Grupo
-        SET miembros = miembros + 1
-        WHERE nombre = :NEW.nombre;
-    ELSIF UPDATING THEN
-        UPDATE Grupo
-        SET miembros = miembros + (:NEW.miembros - :OLD.miembros)
-        WHERE nombre = :NEW.nombre;
-    ELSIF DELETING THEN
-        UPDATE Grupo
-        SET miembros = miembros - 1
-        WHERE nombre = :OLD.nombre;
-    END IF;
+    :new.miembros=:old.miembros+:new.miembros
 END;
 /
 
 --EL
-CREATE OR REPLACE TRIGGER TR_eliminar_grupo
+--Todo esto se hace en seguridad
+/*CREATE OR REPLACE TRIGGER TR_eliminar_grupo
 BEFORE DELETE ON Grupo
 FOR EACH ROW
 DECLARE
@@ -844,10 +846,11 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20001, 'Solo el organizador puede eliminar miembros del grupo.');
     END IF;
 END;
-/
+/*/
 
 --Mantener chat
 --AD
+--Donde esta el id autogenerado ??
 CREATE OR REPLACE TRIGGER TR_Chat_unicoUsuario
 BEFORE INSERT ON Chat
 FOR EACH ROW
@@ -865,6 +868,7 @@ CREATE OR REPLACE TRIGGER TR_generar_apodo
 BEFORE INSERT ON Chat
 FOR EACH ROW
 BEGIN
+    --?????????????????? no existe generar apodo lo que si se genera es el id_chat
     IF :NEW.apodo IS NULL OR :NEW.apodo = '' THEN
         SELECT 'Chat' || u.nombre INTO :NEW.apodo
         FROM Usuario u
@@ -922,20 +926,28 @@ BEGIN
     RETURN v_cur;
 END;
 /
-CREATE OR REPLACE TRIGGER TR_actualizar_localizacion
-AFTER INSERT OR UPDATE ON Usuario
-FOR EACH ROW
-DECLARE
-    v_latitud NUMBER(10,8);
-    v_longitud NUMBER(10,8);
-BEGIN
-    SELECT latitud, longitud INTO v_latitud, v_longitud --Ubi del usuario
-    FROM obtener_ubicacion_actual();
-    UPDATE Localizacion
-    SET latitud = v_latitud, longitud = v_longitud
-    WHERE id_localizacion = :NEW.id_localizacion;
-END;
 */
+
+--Cree esto para generar  id de localizacion ya
+--no es necesario hacer latitud y longitud random ya que las da el usuario
+CREATE SEQUENCE secuencia_localizacion
+  START WITH 100
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+/
+
+CREATE OR REPLACE TRIGGER TR_Localizacion_nuevaLoc
+BEFORE INSERT ON Usuario
+FOR EACH ROW
+BEGIN
+    :new.id_localizacion=secuencia_evento.NEXTVAL;
+    
+END;
+/
 --MO
 CREATE OR REPLACE TRIGGER TR_modificar_localizacion
 BEFORE UPDATE ON Localizacion
@@ -957,10 +969,8 @@ BEGIN
     SELECT COUNT(*) INTO contador
     FROM Usuario
     WHERE id_localizacion = :OLD.id_localizacion;
-    
-    IF contador = 0 THEN
-        DELETE FROM Localizacion
-        WHERE id_localizacion = :OLD.id_localizacion;
+    IF contador != 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar');
     END IF;
 END;
 /
@@ -973,6 +983,8 @@ FOR EACH ROW
 DECLARE
     v_idp_plan NUMBER(6);
 BEGIN
+    --De que estado???????? publicidad no es un plan, es una tabla
+    --Independiente.
     IF :NEW.estado = 'free' THEN
         SELECT NVL(MAX(idp_plan), 0) + 1 INTO v_idp_plan FROM Free;
         -- Insertar una nueva fila en la tabla Free
@@ -1015,6 +1027,9 @@ END;
 
 /*VISTAS*/
 
+--Si quieres crear vistas mira las consultas que estan en el diseño de componenetes.
+
+--Bien
 --Vista de libros de otro usuario que esten disponibles
 CREATE VIEW Vista_Libros_Disponibles AS
 SELECT l.nombreUsuario, l.titulo, l.autor, l.sinopsis, l.editorial, l.comentario, l.fecha_impresion
@@ -1022,12 +1037,14 @@ FROM Libro l
 JOIN Usuario u ON l.nombreUsuario = u.nombreUsuario
 WHERE l.estado = 'A';
 
+--Mal, nunca usas un join no es una cosulta necesaria 
 --Vista del lugar del evento
 CREATE VIEW Vista_Lugar_Evento AS
 SELECT e.asisten, e.fecha_inicio, e.fecha_finalizacion, e.proposito, e.nombre, e.id_localizacion, l.latitud, l.longitud
 FROM Evento e
 INNER JOIN Localizacion l ON e.id_localizacion = l.id_localizacion;
 
+--Bien
 --Vista de los planes para el usuario
 CREATE VIEW Vista_Planes_usuario AS
 SELECT p.idp, p.estado, p.fecha_inicio, 'Plus' AS tipo_plan, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
@@ -1038,20 +1055,21 @@ SELECT p.idp, p.estado, p.fecha_inicio, 'Free' AS tipo_plan, f.cantidad_megustas
 FROM Plan_ p
 JOIN Free f ON p.idp = f.idp_plan;
 
-
+--Para que quiero hacer eso ???
 --Vista de libros con su localizacion
 CREATE VIEW Vista_Libros_Localizacion AS
 SELECT l.nombreUsuario, l.titulo, l.autor, l.sinopsis, l.editorial, l.comentario, l.fecha_impresion, l.estado, loc.latitud, loc.longitud
 FROM Libro l
 JOIN Localizacion loc ON l.nombreUsuario = loc.id_localizacion;
 
+--Ok
 --Vistas de eventos con su localizacion
 CREATE VIEW Vista_eventos_localizacion AS
 SELECT e.id_evento, e.id_grupo, e.nombre, e.proposito, e.fecha_inicio, e.fecha_finalizacion, loc.id_localizacion, loc.latitud, loc.longitud
 FROM Evento e
 LEFT JOIN Localizacion loc ON e.id_localizacion = loc.id_localizacion;
 
-
+--Bien
 --Vista de intercambios de libros con informacion de los usuarios
 CREATE VIEW intercambios_usuarios AS
 SELECT i.id_inter, i.id_chat, i.libro_inter1, u1.nombre AS nombre_usuario1, i.libro_inter2, u2.nombre AS nombre_usuario2, i.fechaCreacion, i.fechaEntrega, i.calificacion, i.estado
@@ -1059,6 +1077,7 @@ FROM Intercambio i
 INNER JOIN Usuario u1 ON i.usuario1 = u1.nombreUsuario
 INNER JOIN Usuario u2 ON i.usuario2 = u2.nombreUsuario;
 
+--Mira los componentes y ponle logica, lo puse de tal manera que sea secuencial las funciones
 
 
 
@@ -1072,7 +1091,11 @@ DROP VIEW intercambios_usuarios;
 
 
 
-/*CRUDE*/
+--CRUDE
+--El CRUDE son los paquetes de los componentes
+--MAL SIGUE EL DISEÑO DE COMPONENTES, NO ES LA PRIMERA VEZ QUE TE LO DIGO.
+
+/*
 --implementacion del paquete correspondiente al CRUD Intercambio
 create or replace PACKAGE PC_Intercambio AS
 PROCEDURE adicionar_Inter(in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_calificacion IN NUMBER, in_estado IN VARCHAR);
@@ -1081,7 +1104,10 @@ PROCEDURE eliminar_Inter(in_id_inter IN NUMBER);
 PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR);
 END;
 /
-/*CRUDI*/
+
+--CRUDI
+
+--El CRUDI son los de sguridad, por aqui no va nada de esto.
 CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
 --Procedimiento para adicionar un intercambio
   PROCEDURE adicionar_Inter(
@@ -1164,10 +1190,12 @@ END;
 
 END PC_Intercambio;
 /
-
+*/
 ---------------------------------------------------------------------------------------------------------------------------------------
 
 /*CRUDE*/
+--NO EXISTE EL PAQUETE LIBRO ¡¡¡?????!!!!!
+/*
 --implementacion del paquete correspondiente al CRUD Libros
 create or replace PACKAGE PC_Libro AS
 PROCEDURE adicionar_Libro(li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
@@ -1178,6 +1206,7 @@ END;
 /
 
 /*CRUDI*/
+/*
 CREATE OR REPLACE PACKAGE BODY PC_Libro AS
 --Procedimiento para adicionar un Libro
 PROCEDURE adicionar_Libro(
@@ -1258,11 +1287,13 @@ END;
 
 END PC_Libro;
 /
-
+*/
 ---------------------------------------------------------------------------------------------------------------------------------------
 
 /*CRUDE*/
+--En serio ?
 --implementacion del paquete correspondiente al CRUD Eventos
+/*
 create or replace PACKAGE PC_Evento AS
 PROCEDURE adicionar_Evento(ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
 PROCEDURE modificar_Evento(ev_id_evento IN NUMBER, ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
@@ -1272,6 +1303,7 @@ END;
 /
 
 /*CRUDI*/
+/*
 CREATE OR REPLACE PACKAGE BODY PC_Usuario AS
 --Procedimiento para adicionar un Evento
 PROCEDURE adicionar_Evento(
@@ -1341,6 +1373,7 @@ END;
 
 END PC_Evento;
 /   
+*/
 
 /*XCRUD*/
 DROP PACKAGE PC_Intercambio;
@@ -1357,6 +1390,7 @@ CREATE ROLE PA_JUNTAA;
 --CREATE ROLE PA_SERVIDOR;
 CREATE ROLE PA_USUARIOO;
 
+--Aca ya no miro nada si todos los paquetes estan mal 
 
 /*ActoresI*/
 /
