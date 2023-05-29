@@ -1092,16 +1092,24 @@ DROP VIEW intercambios_usuarios;
 
 
 --CRUDE
---El CRUDE son los paquetes de los componentes
---MAL SIGUE EL DISEÑO DE COMPONENTES, NO ES LA PRIMERA VEZ QUE TE LO DIGO.
 
-/*
 --implementacion del paquete correspondiente al CRUD Intercambio
 create or replace PACKAGE PC_Intercambio AS
-PROCEDURE adicionar_Inter(in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_calificacion IN NUMBER, in_estado IN VARCHAR);
-PROCEDURE modificar_Inter(in_id_inter IN NUMBER, in_id_chat IN NUMBER,in_libro_inter1 IN NUMBER, in_usuario1 IN NUMBER, in_libro_inter2 IN NUMBER, in_usuario2 IN NUMBER, in_fechaCreacion IN DATE, in_fechaEntrega IN DATE, in_calificacion IN NUMBER, in_estado IN VARCHAR);
-PROCEDURE eliminar_Inter(in_id_inter IN NUMBER);
-PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR);
+PROCEDURE ad_Chat(ch_nombre_grupo IN VARCHAR2, ch_usuario1 IN VARCHAR2, ch_usuario2 IN VARCHAR2, ch_apodo IN VARCHAR2);
+PROCEDURE mo_ChatApodo(ch_id_chat IN NUMBER,ch_apodo IN VARCHAR2 );
+PROCEDURE el_Chat(ch_id_chat IN NUMBER);
+
+PROCEDURE ad_Inter(in_id_chat IN NUMBER, in_libro_inter1 IN VARCHAR2, in_libro_inter2 IN VARCHAR2);
+PROCEDURE mo_Inter_Estado(in_id_inter IN NUMBER, in_estado IN VARCHAR2);
+PROCEDURE mo_Inter_Calificacion(in_id_inter IN NUMBER, in_calificacion IN NUMBER);
+PROCEDURE el_Intercambio(in_id_inter IN NUMBER);
+PROCEDURE co_Inter_Estado(in_id_inter IN NUMBER);
+PROCEDURE co_Inter_Calificacion(in_id_inter IN NUMBER);
+
+PROCEDURE ad_Notificacion(no_id_inter IN NUMBER, no_descripcion IN VARCHAR2);
+PROCEDURE mo_Notificacion(no_codigo_noti IN NUMBER, no_descripcion IN VARCHAR2 );
+PROCEDURE el_Notificacion(no_codigo_noti IN NUMBER);
+
 END;
 /
 
@@ -1109,17 +1117,15 @@ END;
 
 --El CRUDI son los de sguridad, por aqui no va nada de esto.
 CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
---Procedimiento para adicionar un intercambio
-  PROCEDURE adicionar_Inter(
-    in_libro_inter1 IN NUMBER, 
-    in_usuario1 IN NUMBER, 
-    in_libro_inter2 IN NUMBER, 
-    in_usuario2 IN NUMBER, 
-    in_calificacion IN NUMBER, 
-    in_estado IN VARCHAR
+--Procedimiento para adicionar un chat
+  PROCEDURE ad_chat(
+    ch_nombre_grupo IN VARCHAR2,
+    ch_usuario1 IN VARCHAR2, 
+    ch_usuario2 IN VARCHAR2, 
+    ch_apodo IN VARCHAR2
     ) IS
   BEGIN
-    INSERT INTO Intercambio VALUES (5467892984,1267489874,1234568901,1235679873,4,in_estado);
+    INSERT INTO Chat VALUES (ch_nombre_grupo,ch_usuario1,ch_usuario2,ch_apodo);
     IF(SQL%ROWCOUNT = 0) THEN
         RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
     END IF;
@@ -1130,32 +1136,16 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
   
-  -- Procedimiento para modificar un intercambio
-  PROCEDURE modificar_Inter(
-    in_id_inter IN NUMBER,
-    in_id_chat IN NUMBER,
-    in_libro_inter1 IN NUMBER,
-    in_usuario1 IN NUMBER,
-    in_libro_inter2 IN NUMBER,
-    in_usuario2 IN NUMBER,
-    in_fechaCreacion IN DATE,
-    in_fechaEntrega IN DATE,
-    in_calificacion IN NUMBER,
-    in_estado IN VARCHAR2
+-- Procedimiento para modificar un chat apodo
+  PROCEDURE mo_ChatApodo(
+    ch_id_chat IN NUMBER,
+    ch_apodo IN VARCHAR2 
   ) IS
   BEGIN
-    UPDATE Intercambio
+    UPDATE Chat
     SET
-      id_chat = in_id_chat,
-      libro_inter1 = in_libro_inter1,
-      usuario1 = in_usuario1,
-      libro_inter2 = in_libro_inter2,
-      usuario2 = in_usuario2,
-      fechaCreacion = in_fechaCreacion,
-      fechaEntrega = in_fechaEntrega,
-      calificacion = in_calificacion,
-      estado = in_estado
-    WHERE id_inter = in_id_inter;
+      apodo = ch_apodo
+    WHERE id_chat = ch_id_chat;
     IF(SQL%ROWCOUNT = 0) THEN
         RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
     END IF;
@@ -1166,10 +1156,85 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
   
---Procedimiento para eliminar un intercambio
-  PROCEDURE eliminar_Combo(in_id_inter IN NUMBER,  in_id_chat IN NUMBER ) IS
+--Procedimiento para eliminar un chat
+  PROCEDURE el_Chat(ch_id_chat IN NUMBER ) IS
   BEGIN
-    DELETE FROM Intercambio WHERE id_inter = in_id_inter AND id_chat = in_id_chat;
+    DELETE FROM Chat WHERE id_chat = ch_id_chat;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+---------------
+--Procedimiento para adicionar un chat
+  PROCEDURE ad_Inter(
+    in_id_chat IN NUMBER,
+    in_libro_inter1 IN VARCHAR2,
+    in_libro_inter2 IN VARCHAR2
+    ) IS
+  BEGIN
+    INSERT INTO Intercambio VALUES (2000, in_libro_inter1, in_libro_inter2);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+
+-- Procedimiento para modificar el estado de un intercambio
+    PROCEDURE mo_Inter_Estado(
+        in_id_inter IN NUMBER,
+        in_estado IN VARCHAR2
+    ) IS
+    BEGIN
+        UPDATE Intercambio
+        SET
+        estado = in_estado
+        WHERE id_inter = in_id_inter;
+        IF(SQL%ROWCOUNT = 0) THEN
+            RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+        END IF;
+        COMMIT;
+    EXCEPTION
+        WHEN OTHERS THEN
+            ROLLBACK;
+            RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+    END;
+ 
+  -- Procedimiento para modificar la calificacion de un intercambio
+  PROCEDURE mo_Inter_Calificacion(
+    in_id_inter IN NUMBER, 
+    in_calificacion IN NUMBER
+  ) IS
+  BEGIN
+    UPDATE Intercambio
+    SET
+      calificacion = in_calificacion
+    WHERE id_inter = in_id_inter;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+
+--PROCEDURE el_Intercambio(in_id_inter IN NUMBER);
+--Procedimiento para eliminar un intercambio
+
+  PROCEDURE el_Intercambio(in_id_inter IN NUMBER ) IS
+  BEGIN
+    DELETE FROM Intercambio WHERE id_inter = in_id_inter;
     IF(SQL%ROWCOUNT = 0) THEN
         RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
     END IF;
@@ -1180,17 +1245,26 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
 
---Procedimiento para consultar un intercambio
-  PROCEDURE consulta_Inter_Estado(in_estado IN VARCHAR) IS
+--Procedimiento para consultar el estado de un intercambio // creeria que el atributo es estado pero lo deje como estaba en el astha 
+  PROCEDURE co_Inter_Estado(in_id_inter IN NUMBER) IS
   suma NUMBER;
 BEGIN
-  SELECT COUNT(*) INTO suma FROM Intercambio WHERE estado = in_estado;
+  SELECT COUNT(*) INTO suma FROM Intercambio WHERE id_inter = in_id_inter;
   DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
 END;
 
+--PROCEDURE co_Inter_Calificacion(in_id_inter IN NUMBER) // el atributo segun mi opinion deberia ser calificacion
+  PROCEDURE Inter_Calificacion(in_id_inter IN NUMBER) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Intercambio WHERE id_inter = in_id_inter;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
 END PC_Intercambio;
 /
-*/
+
+
+
 ---------------------------------------------------------------------------------------------------------------------------------------
 
 /*CRUDE*/
@@ -1198,6 +1272,25 @@ END PC_Intercambio;
 /*
 --implementacion del paquete correspondiente al CRUD Libros
 create or replace PACKAGE PC_Libro AS
+--Procedimiento para consultar el estado de un intercambio // creeria que el atributo es estado
+  PROCEDURE co_Inter_Estado(in_id_inter IN NUMBER) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Intercambio WHERE id_inter = in_id_inter;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+
+--PROCEDURE co_Inter_Calificacion(in_id_inter IN NUMBER);
+  PROCEDURE Inter_Calificacion(in_id_inter IN NUMBER) IS
+  suma NUMBER;
+BEGIN
+  SELECT COUNT(*) INTO suma FROM Intercambio WHERE calificacion = in_estado;
+  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
+END;
+END PC_Intercambio;
+/
+
+
 PROCEDURE adicionar_Libro(li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
 PROCEDURE modificar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER, li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
 PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER);
