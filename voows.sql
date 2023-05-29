@@ -947,7 +947,6 @@ DROP VIEW intercambios_usuarios;
 
 
 
-
 --CRUDE
 --implementacion del paquete correspondiente al CRUD Plan
 create or replace PACKAGE PC_Plan AS
@@ -1338,6 +1337,220 @@ END;
 
 ---------------
 
+--implementacion del paquete correspondiente al CRUD Grupo
+create or replace PACKAGE PC_Grupo AS
+PROCEDURE ad_Grupo(gr_nombre IN VARCHAR2, gr_organizador_grupo IN VARCHAR2, gr_estado IN VARCHAR2, gr_reglas IN VARCHAR2, gr_descripcion IN VARCHAR2);
+PROCEDURE mo_GrupoDescripcion(gr_nombre IN VARCHAR2,gr_descripcion IN VARCHAR2);
+PROCEDURE mo_GrupoReglas(gr_nombre IN VARCHAR2,gr_reglas IN VARCHAR2);
+PROCEDURE mo_GrupoMiembros(gr_nombre IN VARCHAR2);
+PROCEDURE el_Grupo(gr_nombre IN VARCHAR2);
+PROCEDURE co_GrupoEventos(gr_nombre IN VARCHAR2);
+PROCEDURE ad_LocalizacionEvento(gr_latitud IN NUMBER, gr_longitud IN NUMBER);
+PROCEDURE ad_Evento(gr_id_grupo IN VARCHAR2, gr_id_localizacion IN VARCHAR2, gr_nombre IN VARCHAR2, gr_proposito IN VARCHAR2, gr_fecha_inicio IN DATE, gr_fecha_finalizacion IN DATE);
+PROCEDURE mo_EventoAsisten(gr_id_evento IN NUMBER);
+PROCEDURE mo_EventoInteresados(gr_id_evento IN NUMBER);
+PROCEDURE el_Evento(gr_id_evento IN NUMBER);
+
+--CRUDI
+
+CREATE OR REPLACE PACKAGE BODY PC_Grupo  AS
+--Procedimiento para adicionar un chat
+  PROCEDURE ad_Grupo(
+    gr_nombre IN VARCHAR2, 
+    gr_organizador_grupo IN VARCHAR2, 
+    gr_estado IN VARCHAR2, 
+    gr_reglas IN VARCHAR2, 
+    gr_descripcion IN VARCHAR2
+    ) IS
+  BEGIN
+    INSERT INTO Grupo VALUES (gr_nombre, gr_organizador_grupo, gr_estado, gr_reglas, gr_descripcion);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- Procedimiento para modificar la descripcion de un grupo
+  PROCEDURE mo_GrupoDescripcion(
+    gr_nombre IN VARCHAR2,
+    gr_descripcion IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Grupo
+    SET
+      descripcion = gr_descripcion
+    WHERE nombre = gr_nombre;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+-- Procedimiento para modificar las reglas de un grupo
+  PROCEDURE mo_GrupoReglas(
+    gr_nombre IN VARCHAR2,
+    gr_reglas IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Grupo
+    SET
+      reglas = gr_reglas
+    WHERE nombre = gr_nombre;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- Procedimiento para modificar los miembros de un grupo
+  PROCEDURE mo_GrupoMiembros(
+    gr_nombre IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Grupo
+    WHERE nombre = gr_nombre;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+--Procedimiento para eliminar un grupo
+  PROCEDURE el_Grupo(gr_nombre IN VARCHAR2) IS
+  BEGIN
+    DELETE FROM Grupo WHERE nombre = gr_nombre;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+-- procedimiento para consultar el evento de un grupo 
+CREATE OR REPLACE PROCEDURE co_GrupoEventos(gr_nombre IN VARCHAR2) IS
+BEGIN
+  SELECT id_evento, nombre, proposito, fecha_inicio, fecha_finalizacion
+  FROM Evento
+  WHERE id_grupo = gr_nombre;
+END;
+/
+
+--PROCEDURE ad_Evento(gr_id_grupo IN VARCHAR2, gr_id_localizacion IN VARCHAR2, gr_nombre IN VARCHAR2, gr_proposito IN VARCHAR2, gr_fecha_inicio IN DATE, gr_fecha_finalizacion IN DATE);
+--Procedimiento para adicionar un evento
+CREATE OR REPLACE PROCEDURE ad_Evento(
+  gr_id_grupo IN VARCHAR2,
+  gr_id_localizacion IN NUMBER,
+  gr_nombre IN VARCHAR2,
+  gr_proposito IN VARCHAR2,
+  gr_fecha_inicio IN DATE,
+  gr_fecha_finalizacion IN DATE
+) IS
+BEGIN
+  DECLARE
+    v_next_id NUMBER(6);
+  BEGIN
+    SELECT NVL(MAX(id_evento), 0) + 1 INTO v_next_id FROM Evento;
+    INSERT INTO Evento(id_evento, id_grupo, id_localizacion, nombre, proposito, fecha_inicio, fecha_finalizacion)
+    VALUES (v_next_id, gr_id_grupo, gr_id_localizacion, gr_nombre, gr_proposito, gr_fecha_inicio, gr_fecha_finalizacion);
+    COMMIT;
+END;
+/
+
+--procedimiento para adicionar la localizacion de un evento 
+CREATE OR REPLACE PROCEDURE ad_LocalizacionEvento(gr_latitud IN NUMBER, gr_longitud IN NUMBER) IS
+  v_id_localizacion NUMBER(6);
+BEGIN
+  -- Obtener el proximo ID de localizacion
+  SELECT MAX(id_localizacion) + 1 INTO v_id_localizacion FROM Localizacion;
+  INSERT INTO Localizacion(id_localizacion, latitud, longitud)
+  VALUES (v_id_localizacion, gr_latitud, gr_longitud);
+  UPDATE Evento
+  SET id_localizacion = v_id_localizacion
+  WHERE id_evento = <id_del_evento>; 
+END;
+/
+
+
+--PROCEDURE mo_EventoAsisten(gr_id_evento IN NUMBER);
+--procedimiento para modificar los asistentes de un evento 
+  PROCEDURE mo_EventoAsisten(
+    gr_id_evento IN NUMBER,
+    gr_asisten IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Evento
+    SET asisten = gr_asisten
+    WHERE id_evento = gr_id_evento;
+     IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+
+--procedimiento para modificar los interesados de un evento
+  PROCEDURE mo_EventoInteresados(
+    gr_id_evento IN NUMBER
+    gr_interesados IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Evento
+    SET interesados = gr_interesados
+    WHERE id_evento = gr_id_evento;
+     IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- procedimiento para eliminar un evento 
+  PROCEDURE el_Evento(gr_id_evento IN NUMBER) IS
+  BEGIN
+    DELETE FROM Evento WHERE id_evento = gr_id_evento;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+
+
 --implementacion del paquete correspondiente al CRUD Intercambio
 create or replace PACKAGE PC_Intercambio AS
 PROCEDURE ad_Chat(ch_nombre_grupo IN VARCHAR2, ch_usuario1 IN VARCHAR2, ch_usuario2 IN VARCHAR2, ch_apodo IN VARCHAR2);
@@ -1519,8 +1732,11 @@ END PC_Intercambio;
 
 /*XCRUD*/
 DROP PACKAGE PC_Plan;
+DROP PACKAGE BODY PC_Usuario;
+DROP PACKAGE BODY PC_Grupo;
 DROP PACKAGE PC_Intercambio;
-DROP PACKAGE BODY PC_Usuario
+
+
 
 /*Falta CRUD OK y CRUDNoOK*/
 
