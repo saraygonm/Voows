@@ -947,7 +947,396 @@ DROP VIEW intercambios_usuarios;
 
 
 
+
 --CRUDE
+--implementacion del paquete correspondiente al CRUD Plan
+create or replace PACKAGE PC_Plan AS
+--PROCEDURE ad_plan(pl_tipoPlan IN VARCHAR2);
+PROCEDURE mo_plan(pl_idp  IN NUMBER,pl_estado IN VARCHAR2 );
+PROCEDURE el_plan(pl_idp IN NUMBER);
+CURSOR co_planes_free();
+CURSOR co_planes_pluss();
+
+PROCEDURE ad_publicidad(pl_nombre IN VARCHAR2, pl_descripcion IN VARCHAR2);
+PROCEDURE mo_publicidad(pl_nombre IN VARCHAR2, pl_descripcion IN VARCHAR2);
+PROCEDURE el_publicidad(pl_idpu IN NUMBER);
+END;
+/
+
+
+--CRUDI
+
+CREATE OR REPLACE PACKAGE BODY PC_Plan AS
+--Procedimiento para adicionar un Plan
+
+-- Procedimiento para modificar un chat plan
+  PROCEDURE mo_plan(
+    pl_idp  IN NUMBER,
+    pl_estado IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Plan
+    SET
+      estado = pl_estado
+    WHERE idp = pl_idp;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+--Procedimiento para eliminar un plan
+  PROCEDURE el_plan(pl_idp IN NUMBER ) IS
+  BEGIN 
+    DELETE FROM Plan WHERE idp = pl_idp;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+--Consultar planes free
+DECLARE
+  CURSOR co_planes_free IS
+    SELECT p.idp, p.estado, p.fecha_inicio, f.cantidad_megustas
+    FROM Plan_ p
+    JOIN Free f ON p.idp = f.idp_plan;
+BEGIN
+  OPEN co_planes_free;
+  LOOP --Recuperar datos
+    FETCH c_planes INTO v_idp, v_estado, v_fecha_inicio, v_cantidad_megustas;
+    EXIT WHEN c_planes%NOTFOUND;
+    DBMS_OUTPUT.PUT_LINE('ID Plan: ' || v_idp);
+    DBMS_OUTPUT.PUT_LINE('Estado: ' || v_estado);
+    DBMS_OUTPUT.PUT_LINE('Fecha de inicio: ' || v_fecha_inicio);
+    DBMS_OUTPUT.PUT_LINE('Cantidad de me gustas: ' || v_cantidad_megustas);
+    DBMS_OUTPUT.PUT_LINE('------------------------');
+  END LOOP;
+  CLOSE co_planes_free;
+END;
+/
+
+--Consultar planes plus
+DECLARE
+   CURSOR co_planes_pluss IS
+      SELECT p.idp, p.estado, p.fecha_inicio, pl.cantidad_megustas, pl.fecha_de_fin, pl.precio, pl.medio_pago
+      FROM Plan_ p
+      INNER JOIN Plus pl ON p.idp = pl.idp_plan;
+   
+   -- Variables para almacenar los datos del cursor
+   v_idp PLAN_.idp%TYPE;
+   v_estado PLAN_.estado%TYPE;
+   v_fecha_inicio PLAN_.fecha_inicio%TYPE;
+   v_cantidad_megustas PLUS.cantidad_megustas%TYPE;
+   v_fecha_de_fin PLUS.fecha_de_fin%TYPE;
+   v_precio PLUS.precio%TYPE;
+   v_medio_pago PLUS.medio_pago%TYPE;
+BEGIN
+   OPEN co_planes_pluss;
+   LOOP
+      FETCH co_planes_pluss INTO v_idp, v_estado, v_fecha_inicio, v_cantidad_megustas, v_fecha_de_fin, v_precio, v_medio_pago;
+
+      EXIT WHEN co_planes_pluss%NOTFOUND;
+
+      DBMS_OUTPUT.PUT_LINE('ID Plan: ' || v_idp);
+      DBMS_OUTPUT.PUT_LINE('Estado: ' || v_estado);
+      DBMS_OUTPUT.PUT_LINE('Fecha de inicio: ' || v_fecha_inicio);
+      DBMS_OUTPUT.PUT_LINE('Cantidad de megustas: ' || v_cantidad_megustas);
+      DBMS_OUTPUT.PUT_LINE('Fecha de fin: ' || v_fecha_de_fin);
+      DBMS_OUTPUT.PUT_LINE('Precio: ' || v_precio);
+      DBMS_OUTPUT.PUT_LINE('Medio de pago: ' || v_medio_pago);
+   END LOOP;
+   CLOSE co_planes_pluss;
+END;
+/
+----------
+--Procedimiento para adicionar una publicidad
+  PROCEDURE ad_publicidad(
+    pl_nombre IN VARCHAR2, 
+    pl_descripcion IN VARCHAR2
+    ) IS
+  BEGIN
+    INSERT INTO Publicidad VALUES (pl_nombre, pl_descripcion);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+
+-- Procedimiento para modificar una publicidad
+  PROCEDURE mo_publicidad(
+    pl_nombre IN VARCHAR2,
+    pl_descripcion IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Publicidad
+    SET
+      descripcion = pl_descripcion
+    WHERE nombre= pl_nombre;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+ 
+--Procedimiento para eliminar una publicidad
+  PROCEDURE el_publicidad(pl_idpu IN NUMBER) IS
+  BEGIN
+    DELETE FROM Publicidad WHERE idpu = pl_idpu;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+---------------
+--implementacion del paquete correspondiente al CRUD usuario
+create or replace PACKAGE PC_Usuario AS
+PROCEDURE ad_LocalizacionUsuario(us_latitud IN NUMBER, us_longitud IN NUMBER);
+PROCEDURE ad_Usuario(us_nombre_usuario IN VARCHAR2, us_id_free IN NUMBER,us_id_pluss IN NUMBER, us_id_localizacion IN NUMBER, us_correo IN VARCHAR2, us_contrasenia IN VARCHAR2, us_nombre IN VARCHAR2);
+PROCEDURE mo_UsuarioEstadoFecha(us_nombre_usuario IN VARCHAR2);
+PROCEDURE mo_UsuarioContrasenia(us_nombre_usuario IN VARCHAR2, us_contrasenia IN VARCHAR2);
+PROCEDURE mo_UsuarioPlan(us_id_free IN NUMBER,us_id_pluss IN NUMBER);
+PROCEDURE el_Usuario(us_nombre_usuario IN VARCHAR2);
+
+PROCEDURE ad_Libro(us_nombre_usuario IN VARCHAR2, us_titulo IN VARCHAR2, us_autor IN VARCHAR2, us_sinopsis IN VARCHAR2, us_editorial IN VARCHAR2, us_comentario IN VARCHAR2, us_fecha_impresion IN DATE);
+PROCEDURE ad_GeneroLibro(us_nombre_usuario IN VARCHAR2, us_titulo IN VARCHAR2, us_genero IN VARCHAR2)
+PROCEDURE mo_LibroEstado(us_nombre_usuario IN VARCHAR2, us_titulo IN VARCHAR2, us_estado IN VARCHAR2);
+PROCEDURE el_Libro(us_nombre_usuario IN VARCHAR2);
+
+PROCEDURE ad_Archivo();
+PROCEDURE mo_Archivo();
+PROCEDURE el_Archivo();
+PROCEDURE co_LibrosDisponibles(us_nombre_usuario IN VARCHAR2);
+END;
+/
+
+--CRUDI
+
+CREATE OR REPLACE PACKAGE BODY PC_Usuario AS
+--Procedimiento para adicionar la lozalizacion de un usuario
+PROCEDURE ad_LocalizacionUsuario(
+    us_latitud IN NUMBER, 
+    us_longitud IN NUMBER,
+    us_id_localizacion OUT NUMBER -- Parámetro de salida para obtener el ID de localizacian generado
+) IS
+BEGIN
+    INSERT INTO Localizacion (latitud, longitud)
+    VALUES (us_latitud, us_longitud)
+    RETURNING id_localizacion INTO us_id_localizacion; -- Obtener el ID de localizacion generado
+    -- Confirmar la transaccion
+    COMMIT;
+END;
+/
+
+--Procedimiento para adicionar un usuario
+PROCEDURE ad_Usuario(
+    us_nombre_usuario IN VARCHAR2, 
+    us_id_free IN NUMBER,
+    us_id_pluss IN NUMBER, 
+    us_id_localizacion IN NUMBER, 
+    us_correo IN VARCHAR2, 
+    us_contrasenia IN VARCHAR2, 
+    us_nombre IN VARCHAR2
+) IS
+BEGIN
+    -- Llamar al procedimiento ad_LocalizacionUsuario para generar el ID de localizacióon
+    DECLARE
+        v_us_id_localizacion NUMBER; 
+    BEGIN
+        ad_LocalizacionUsuario(us_latitud, us_longitud, v_us_id_localizacion);
+        us_id_localizacion := v_us_id_localizacion; -- Asignar el ID de localizacion que se genero
+
+    -- Insertar el nuevo usuario en la tabla correspondiente
+    INSERT INTO Usuario (nombre_usuario, id_free, id_pluss, id_localizacion, correo, contrasenia, nombre)
+    VALUES (us_nombre_usuario, us_id_free, us_id_pluss, us_id_localizacion, us_correo, us_contrasenia, us_nombre);
+    COMMIT;
+END;
+/
+
+-- Procedimiento para modificar el estado de un usuario
+  PROCEDURE mo_UsuarioEstadoFecha(
+    us_nombre_usuario IN VARCHAR2 
+  ) IS
+  BEGIN
+    UPDATE Usuario
+    WHERE nombre_usuario= us_nombre_usuario;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- Procedimiento para modificar la contrasenia de un usuario
+  PROCEDURE mo_UsuarioContrasenia(
+    us_nombre_usuario IN VARCHAR2,
+    us_contrasenia IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Usuario
+    SET
+      contrasenia = us_contrasenia
+    WHERE nombre_usuario = us_nombre_usuario;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- Procedimiento para modificar el plan de un usuario
+  PROCEDURE mo_UsuarioPlan(
+    us_id_free IN NUMBER,
+    us_id_pluss IN NUMBER
+  ) IS
+  BEGIN
+    UPDATE Usuarioa
+    WHERE idp_plan = us_id_free AND idp_plan = us_id_pluss;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+  
+--Procedimiento para eliminar un usuario
+  PROCEDURE el_Usuario(us_nombre_usuario IN VARCHAR2) IS
+  BEGIN
+    DELETE FROM Usuario WHERE nombre_usuario = us_nombre_usuario ;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+--Procedimiento para adicionar un libro
+  PROCEDURE ad_Libro(
+    us_nombre_usuario IN VARCHAR2, 
+    us_titulo IN VARCHAR2, 
+    us_autor IN VARCHAR2, 
+    us_sinopsis IN VARCHAR2, 
+    us_editorial IN VARCHAR2, 
+    us_comentario IN VARCHAR2, 
+    us_fecha_impresion IN DATE
+    ) IS
+  BEGIN
+    INSERT INTO Libro VALUES (us_nombre_usuario, us_titulo,us_autor,us_sinopsis, us_editorial , us_comentario, us_fecha_impresion);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+--Procedimiento para adicionar el genero de un libro
+  PROCEDURE ad_GeneroLibro(
+    us_nombre_usuario IN VARCHAR2, 
+    us_titulo IN VARCHAR2, 
+    us_genero IN VARCHAR2
+    ) IS
+  BEGIN
+    INSERT INTO Libro VALUES (us_nombre_usuario, us_titulo, us_genero);
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+--procedimiento para modificar el estado un libro
+  PROCEDURE mo_LibroEstado(
+    us_nombre_usuario IN VARCHAR2, 
+    us_titulo IN VARCHAR2, 
+    us_estado IN VARCHAR2
+  ) IS
+  BEGIN
+    UPDATE Libro
+    SET
+      titulo = us_titulo,
+      estado = us_estado
+    WHERE nombre_usuario= us_nombre_usuario;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+-- procedimiento para eliminar un libro
+  PROCEDURE el_Libro(us_nombre_usuario IN VARCHAR2) IS
+  BEGIN
+    DELETE FROM Libro WHERE nombre_usuario= us_nombre_usuario;
+    IF(SQL%ROWCOUNT = 0) THEN
+        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
+    END IF;
+    COMMIT;
+  EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
+  END;
+/
+
+--procedimiento para consultar los libros disponibles
+CREATE OR REPLACE PROCEDURE co_LibrosDisponibles(us_nombre_usuario IN VARCHAR2) IS
+BEGIN
+  SELECT titulo, autor, sinopsis, editorial, estado
+  FROM Libro
+  WHERE nombre_usuario = us_nombre_usuario
+    AND estado = 'A';
+END;
+/
+
+---------------
 
 --implementacion del paquete correspondiente al CRUD Intercambio
 create or replace PACKAGE PC_Intercambio AS
@@ -971,7 +1360,6 @@ END;
 
 --CRUDI
 
---El CRUDI son los de sguridad, por aqui no va nada de esto.
 CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
 --Procedimiento para adicionar un chat
   PROCEDURE ad_chat(
@@ -991,6 +1379,7 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
+/
   
 -- Procedimiento para modificar un chat apodo
   PROCEDURE mo_ChatApodo(
@@ -1011,6 +1400,7 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
+/
   
 --Procedimiento para eliminar un chat
   PROCEDURE el_Chat(ch_id_chat IN NUMBER ) IS
@@ -1025,8 +1415,9 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
+/
 ---------------
---Procedimiento para adicionar un chat
+--Procedimiento para adicionar un intercambio
   PROCEDURE ad_Inter(
     in_id_chat IN NUMBER,
     in_libro_inter1 IN VARCHAR2,
@@ -1043,7 +1434,7 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
-
+/
 
 -- Procedimiento para modificar el estado de un intercambio
     PROCEDURE mo_Inter_Estado(
@@ -1064,7 +1455,8 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
             ROLLBACK;
             RAISE_APPLICATION_ERROR(-20999,SQLERRM);
     END;
- 
+/
+
   -- Procedimiento para modificar la calificacion de un intercambio
   PROCEDURE mo_Inter_Calificacion(
     in_id_inter IN NUMBER, 
@@ -1084,8 +1476,9 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
+/
 
---PROCEDURE el_Intercambio(in_id_inter IN NUMBER);
+
 --Procedimiento para eliminar un intercambio
 
   PROCEDURE el_Intercambio(in_id_inter IN NUMBER ) IS
@@ -1100,6 +1493,7 @@ CREATE OR REPLACE PACKAGE BODY PC_Intercambio AS
         ROLLBACK;
         RAISE_APPLICATION_ERROR(-20999,SQLERRM);
   END;
+/
 
 --Procedimiento para consultar el estado de un intercambio // creeria que el atributo es estado pero lo deje como estaba en el astha 
   PROCEDURE co_Inter_Estado(in_id_inter IN NUMBER) IS
@@ -1108,6 +1502,7 @@ BEGIN
   SELECT COUNT(*) INTO suma FROM Intercambio WHERE id_inter = in_id_inter;
   DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
 END;
+/
 
 --PROCEDURE co_Inter_Calificacion(in_id_inter IN NUMBER) // el atributo segun mi opinion deberia ser calificacion
   PROCEDURE Inter_Calificacion(in_id_inter IN NUMBER) IS
@@ -1121,214 +1516,11 @@ END PC_Intercambio;
 
 
 
----------------------------------------------------------------------------------------------------------------------------------------
-
-/*CRUDE*/
---NO EXISTE EL PAQUETE LIBRO ¡¡¡?????!!!!!
-/*
---implementacion del paquete correspondiente al CRUD Libros
-create or replace PACKAGE PC_Libro AS
---Procedimiento para consultar el estado de un intercambio // creeria que el atributo es estado
-  PROCEDURE co_Inter_Estado(in_id_inter IN NUMBER) IS
-  suma NUMBER;
-BEGIN
-  SELECT COUNT(*) INTO suma FROM Intercambio WHERE id_inter = in_id_inter;
-  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
-END;
-
---PROCEDURE co_Inter_Calificacion(in_id_inter IN NUMBER);
-  PROCEDURE Inter_Calificacion(in_id_inter IN NUMBER) IS
-  suma NUMBER;
-BEGIN
-  SELECT COUNT(*) INTO suma FROM Intercambio WHERE calificacion = in_estado;
-  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
-END;
-END PC_Intercambio;
-/
-
-
-PROCEDURE adicionar_Libro(li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
-PROCEDURE modificar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER, li_titulo IN VARCHAR, li_autor IN VARCHAR, li_sinopsis IN VARCHAR, li_editorial IN VARCHAR, li_comentario IN VARCHAR, li_fecha_impresion IN DATE, li_estado IN VARCHAR);
-PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER);
-PROCEDURE consulta_Libro_Estado(li_estado IN VARCHAR);
-END;
-/
-
-/*CRUDI*/
-/*
-CREATE OR REPLACE PACKAGE BODY PC_Libro AS
---Procedimiento para adicionar un Libro
-PROCEDURE adicionar_Libro(
-    li_titulo IN VARCHAR,
-    li_autor  IN VARCHAR, 
-    li_sinopsis IN VARCHAR, 
-    li_editorial IN VARCHAR, 
-    li_comentario IN VARCHAR, 
-    li_fecha_impresion IN DATE, 
-    li_estado IN VARCHAR
-    ) IS
-  BEGIN
-    INSERT INTO Libro VALUES (li_titulo,li_autor,li_sinopsis,li_editorial,li_comentario,li_fecha_impresion,li_estado);
-    IF(SQL%ROWCOUNT = 0) THEN
-        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
-  END;
-  
-  -- Procedimiento para modificar un Libro
-  PROCEDURE modificar_Libro(
-    li_id_usuario IN NUMBER, 
-    li_ISBN IN NUMBER, 
-    li_titulo IN VARCHAR, 
-    li_autor IN VARCHAR, 
-    li_sinopsis IN VARCHAR, 
-    li_editorial IN VARCHAR, 
-    li_comentario IN VARCHAR, 
-    li_fecha_impresion IN DATE, 
-    li_estado IN VARCHAR
-  ) IS
-  BEGIN
-    UPDATE Libro
-    SET 
-      titulo = li_titulo,
-      autor = li_autor,
-      sinopsis = li_sinopsis,
-      editorial = li_editorial,
-      comentario = li_comentario,
-      fecha_impresion = li_fecha_impresion,
-      estado = li_estado
-    WHERE id_usuario = li_id_usuario AND ISBN = li_ISBN;
-    IF(SQL%ROWCOUNT = 0) THEN
-        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
-  END;
-
---Procedimiento para eliminar un Libro
-  PROCEDURE eliminar_Libro(li_id_usuario IN NUMBER, li_ISBN IN NUMBER) IS
-  BEGIN
-    DELETE FROM Libro WHERE id_usuario = li_id_usuario AND ISBN = li_ISBN ;
-    IF(SQL%ROWCOUNT = 0) THEN
-        RAISE_APPLICATION_ERROR(-20001,'No se pudo eliminar la tupla porque no existe');
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
-  END;
-
---Procedimiento para consultar un  Libro
-  PROCEDURE consulta_libro_Estado(in_estado IN VARCHAR) IS
-  suma NUMBER;
-BEGIN
-  SELECT COUNT(*) INTO suma FROM Libro WHERE estado = li_estado;
-  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
-END;
-
-END PC_Libro;
-/
-*/
----------------------------------------------------------------------------------------------------------------------------------------
-
-/*CRUDE*/
---En serio ?
---implementacion del paquete correspondiente al CRUD Eventos
-/*
-create or replace PACKAGE PC_Evento AS
-PROCEDURE adicionar_Evento(ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
-PROCEDURE modificar_Evento(ev_id_evento IN NUMBER, ev_id_grupo IN VARCHAR,ev_id_localizacion IN NUMBER, ev_nombre IN VARCHAR, ev_proposito IN VARCHAR, ev_fecha_inicio IN DATE, ev_fecha_finalizacion IN DATE, ev_asisten IN VARCHAR, ev_interesados IN VARCHAR);
-PROCEDURE eliminar_Evento(ev_id_evento IN NUMBER);
-PROCEDURE consulta_Evento_Nombre(ev_nombre IN VARCHAR);
-END;
-/
-
-/*CRUDI*/
-/*
-CREATE OR REPLACE PACKAGE BODY PC_Usuario AS
---Procedimiento para adicionar un Evento
-PROCEDURE adicionar_Evento(
-    ev_id_grupo IN VARCHAR,
-    ev_id_localizacion IN NUMBER, 
-    ev_nombre IN VARCHAR, 
-    ev_proposito IN VARCHAR, 
-    ev_fecha_inicio IN DATE, 
-    ev_fecha_finalizacion IN DATE, 
-    ev_asisten IN VARCHAR, 
-    ev_interesados IN VARCHAR
-    ) IS
-  BEGIN
-    INSERT INTO Evento VALUES (ev_id_grupo,234567,ev_nombre,ev_proposito,ev_fecha_inicio,ev_fecha_finalizacion,ev_asisten, ev_interesados);
-    IF(SQL%ROWCOUNT = 0) THEN
-        RAISE_APPLICATION_ERROR(-20001,'No se pudo insetar la tupla');
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
-  END;
-
--- Procedimiento para modificar un evento
-  PROCEDURE modificar_Evento(
-    ev_id_evento IN NUMBER, 
-    ev_id_grupo IN VARCHAR,
-    ev_id_localizacion IN NUMBER, 
-    ev_nombre IN VARCHAR, 
-    ev_proposito IN VARCHAR, 
-    ev_fecha_inicio IN DATE, 
-    ev_fecha_finalizacion IN DATE, 
-    ev_asisten IN VARCHAR, 
-    ev_interesados IN VARCHAR
-    ) IS
-  BEGIN
-    UPDATE Evento
-    SET 
-      id_grupo = ev_id_grupo,
-      id_localizacion = ev_id_localizacion,
-      nombre = ev_nombre,
-      proposito = ev_proposito,
-      fecha_inicio = ev_fecha_inicio,
-      fecha_finalizacion = ev_fecha_finalizacion,
-      asisten = ev_asisten,
-      interesados = ev_interesados
-      estado = us_estado
-    WHERE id_evento = ev_id_evento;
-    IF(SQL%ROWCOUNT = 0) THEN
-        RAISE_APPLICATION_ERROR(-20001,'No se pudo modificar la tupla, porque no existe');
-    END IF;
-    COMMIT;
-  EXCEPTION
-    WHEN OTHERS THEN
-        ROLLBACK;
-        RAISE_APPLICATION_ERROR(-20999,SQLERRM);
-  END;  
-
---Procedimiento para consultar un Evento
-  PROCEDURE consulta_Evento_Nombre(ev_nombre IN VARCHAR) IS
-  suma NUMBER;
-BEGIN
-  SELECT COUNT(*) INTO suma FROM Evento WHERE nombre = ev_nombre;
-  DBMS_OUTPUT.PUT_LINE('Cantidad de filas: ' || suma);
-END;
-
-END PC_Evento;
-/   
-*/
 
 /*XCRUD*/
+DROP PACKAGE PC_Plan;
 DROP PACKAGE PC_Intercambio;
-DROP PACKAGE PC_Libro;
-DROP PACKAGE PC_Usuario;
-DROP PACKAGE PC_Evento;
+DROP PACKAGE BODY PC_Usuario
 
 /*Falta CRUD OK y CRUDNoOK*/
 
