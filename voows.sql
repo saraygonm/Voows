@@ -613,93 +613,57 @@ END;
 /
 --------------------------------------------------------------------------------------------------------
 
+
 --Mantener Archivos
 --Ad
 --codigo es autogenerado y no esta
 
-CREATE OR REPLACE TRIGGER TR_validar_tipo_imagen
-BEFORE INSERT OR UPDATE ON Archivo
-FOR EACH ROW
-DECLARE
-    tipo_valido EXCEPTION;
-    tipo_archivo VARCHAR2(3);
-BEGIN
-    --???????????????? La integridad ya esta programada en atributos !!!!
-    tipo_archivo := UPPER(:NEW.tipo);
-    IF tipo_archivo NOT IN ('JPG', 'GIF', 'BMP', 'PNG') THEN -- tipo valido
-        RAISE tipo_valido;
-    END IF;
-    --Que hace una exception en un trigger ??? Para eso es el trigger, el trigger es la excepcion
-exception
-    --??
-    WHEN tipo_valido THEN
-        raise_application_error(-20001, 'Solo se permiten tipos de imagen: JPG, GIF, BMP, PNG');
-END;
+CREATE SEQUENCE secuencia_archivos
+  START WITH 100
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
 /
 
-create or replace TRIGGER TR_validar_URL
-BEFORE INSERT ON Archivo
-FOR EACH ROW
-DECLARE
-    url_pattern VARCHAR2(100) := '^https://dominio.extension/nombreArchivo.pdf$';
-BEGIN
-    --Otra vezv validado cosas que ya estan hechas .-.
-    IF :NEW.URRL IS NOT NULL AND REGEXP_LIKE(:NEW.URRL, url_pattern) = FALSE THEN
-        RAISE_APPLICATION_ERROR(-20001, 'La URL no cumple con la estructura requerida.');
-    END IF;
-END;
-/
 --Mo
-CREATE OR REPLACE TRIGGER TR_limite_modificaciones
---Ni tu entiendes que hace esto .-.
-BEFORE UPDATE OF URRL, tipo ON Archivo
+CREATE OR REPLACE TRIGGER bloquear_modificaciones
+BEFORE UPDATE ON Archivo
 FOR EACH ROW
-DECLARE
-    contador NUMBER;
 BEGIN
-    SELECT COUNT(*) INTO contador --Numero de modificaciones
-    FROM Archivo
-    WHERE codigo = :NEW.codigo
-    AND (URRL <> :NEW.URRL OR tipo <> :NEW.tipo);
-    IF contador >= 2 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'No se pueden realizar mas de dos modificaciones en la URL o el tipo.');
+    IF :OLD.URRL != :NEW.URRL THEN
+        RAISE_APPLICATION_ERROR(-20001, 'No se permite modificar la URL.');
+    END IF;
+    
+    IF :OLD.tipo != :NEW.tipo THEN
+        RAISE_APPLICATION_ERROR(-20002, 'No se permite modificar el tipo.');
     END IF;
 END;
-/
+/ 
 
 --EL:
 ---Solo se tenia que hacer que los archivos se eliminaran en cascade
---Cuando se elimina libros.
-CREATE OR REPLACE TRIGGER TR_eliminar_archivo
-BEFORE DELETE ON Archivo
-FOR EACH ROW
-DECLARE
-    tiene_intercambio NUMBER;
-BEGIN
-    SELECT COUNT(*) INTO tiene_intercambio --Archivos con procesos asociados
-    FROM Intercambio
-    WHERE libro_inter1 = :OLD.titulo OR libro_inter2 = :OLD.titulo;
-    IF tiene_intercambio = 0 THEN
-        NULL;
-    ELSE
-        RAISE_APPLICATION_ERROR(-20001, 'No se puede eliminar el archivo porque tiene procesos de intercambio asociados.');
-    END IF;
-END;
-/
+ALTER TABLE Archivo DROP CONSTRAINT FK_Archivo;
+ALTER TABLE Archivo DROP CONSTRAINT FK_Archivo FOREIGN KEY (nombreUsuario, titulo)
+REFERENCES Libro(nombreUsuario, titulo) ON DELETE CASCADE
+
 
 --Registrar evento
 CREATE TRIGGER validar_evento
 
 --Ad
+CREATE SEQUENCE secuencia_evento
+  START WITH 1000001 -- mayor a 1000000
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+/
 
-/*CREATE SEQUENCE secuencia_evento START WITH 1 INCREMENT BY 1;
-CREATE OR REPLACE TRIGGER TR_generarid
-BEFORE INSERT ON Evento
-FOR EACH ROW
-BEGIN
-  SELECT secuencia_evento.NEXTVAL INTO :NEW.id_evento FROM DUAL;
-END;
-*/
 
 CREATE OR REPLACE TRIGGER TR_CamposRequeridos_evento
 BEFORE INSERT OR UPDATE ON Evento
@@ -721,37 +685,6 @@ BEGIN
   IF :new.fecha_finalizacion IS NULL THEN
     RAISE_APPLICATION_ERROR(-20004, 'El campo "fecha de finalización" es obligatorio.');
   END IF;
-END;
-/
-
---MO:
-CREATE OR REPLACE TRIGGER TR_mod_localizacionYhorarios
-BEFORE UPDATE ON Evento
-FOR EACH ROW
-DECLARE
-BEGIN
-    --????????? Nadie va actualizar eso ya que eso se bloquea en seguridad
-    IF UPDATING THEN
-            -- No se permite la modificacion del ID de la publicidad
-            IF :new.id_evento <> :old.id_evento THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id del evento.');
-            END IF;
-            IF :new.id_grupo <> :old.id_grupo THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Id Grupo del evento.');
-            END IF;
-            IF :new.nombre <> :old.nombre THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Nombre del evento.');
-            END IF;
-            IF :new.proposito <> :old.proposito THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el Proposito del evento.');
-            END IF;
-            IF :new.asisten <> :old.asisten THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Asisten del evento.');
-            END IF;
-            IF :new.interesados <> :old.interesados THEN
-                RAISE_APPLICATION_ERROR(-20001, 'No se puede modificar el campo Interesados del evento.');
-            END IF;
-    END IF;
 END;
 /
 
@@ -816,41 +749,20 @@ BEGIN
 END;
 /
 
---EL
---Todo esto se hace en seguridad
-/*CREATE OR REPLACE TRIGGER TR_eliminar_grupo
-BEFORE DELETE ON Grupo
-FOR EACH ROW
-DECLARE
-    v_organizador VARCHAR2(50);
-BEGIN
-    SELECT organizador_grupo INTO v_organizador
-    FROM Grupo
-    WHERE nombre = :OLD.nombre;
-
-    IF v_organizador <> USER THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Solo el organizador puede eliminar el grupo.');
-    END IF;
-END;
 /
-CREATE OR REPLACE TRIGGER TR_eliminar_miembro
-BEFORE DELETE ON Grupo
-FOR EACH ROW
-DECLARE
-    v_organizador VARCHAR2(50);
-BEGIN
-    SELECT organizador_grupo INTO v_organizador FROM Grupo WHERE nombre = :old.nombre; --Organizador del grupo
-    IF v_organizador = USER THEN
-        UPDATE Grupo SET miembros = miembros - 1 WHERE nombre = :old.nombre;
-    ELSE
-        RAISE_APPLICATION_ERROR(-20001, 'Solo el organizador puede eliminar miembros del grupo.');
-    END IF;
-END;
-/*/
 
 --Mantener chat
 --AD
---Donde esta el id autogenerado ??
+CREATE SEQUENCE secuencia_chat
+  START WITH 1001 -- mayor a 1000
+  INCREMENT BY 1
+  MAXVALUE 999999999
+  MINVALUE 1
+  NOCYCLE
+  NOCACHE
+  ORDER;
+/
+
 CREATE OR REPLACE TRIGGER TR_Chat_unicoUsuario
 BEFORE INSERT ON Chat
 FOR EACH ROW
@@ -864,18 +776,7 @@ BEGIN
 END;
 /
 
-CREATE OR REPLACE TRIGGER TR_generar_apodo
-BEFORE INSERT ON Chat
-FOR EACH ROW
-BEGIN
-    --?????????????????? no existe generar apodo lo que si se genera es el id_chat
-    IF :NEW.apodo IS NULL OR :NEW.apodo = '' THEN
-        SELECT 'Chat' || u.nombre INTO :NEW.apodo
-        FROM Usuario u
-        WHERE u.nombreUsuario = :NEW.usuario1;
-    END IF;
-END;
-/
+
 --MO
 create or replace TRIGGER TR_modificar_apodo
 BEFORE UPDATE OF apodo ON Chat
@@ -907,29 +808,8 @@ END;
 
 
 --Registrar Localizacion
-/*
-CREATE OR REPLACE FUNCTION obtener_ubicacion_actual
-    RETURN SYS_REFCURSOR
-IS
-    v_latitud NUMBER(10,8);
-    v_longitud NUMBER(10,8);
-    v_cur SYS_REFCURSOR;
-BEGIN
-    -- Generar valores aleatorios de latitud y longitud 
-    v_latitud := DBMS_RANDOM.VALUE(-90, 90);
-    v_longitud := DBMS_RANDOM.VALUE(-180, 180);
+--AD
 
-    OPEN v_cur FOR
-        SELECT v_latitud AS latitud, v_longitud AS longitud
-        FROM DUAL;
-
-    RETURN v_cur;
-END;
-/
-*/
-
---Cree esto para generar  id de localizacion ya
---no es necesario hacer latitud y longitud random ya que las da el usuario
 CREATE SEQUENCE secuencia_localizacion
   START WITH 100
   INCREMENT BY 1
@@ -976,23 +856,6 @@ END;
 /
 
 --Mantener publicidad
---AD
-create or replace TRIGGER TR_AdicionarPlanFree
-AFTER INSERT ON Plan_
-FOR EACH ROW
-DECLARE
-    v_idp_plan NUMBER(6);
-BEGIN
-    --De que estado???????? publicidad no es un plan, es una tabla
-    --Independiente.
-    IF :NEW.estado = 'free' THEN
-        SELECT NVL(MAX(idp_plan), 0) + 1 INTO v_idp_plan FROM Free;
-        -- Insertar una nueva fila en la tabla Free
-        INSERT INTO Free (idp_plan, cantidad_megustas)
-        VALUES (v_idp_plan, 0);
-    END IF;
-END;
-*/
 
 --MO
 create or replace TRIGGER TR_descripcion_publicidad
@@ -1037,12 +900,6 @@ FROM Libro l
 JOIN Usuario u ON l.nombreUsuario = u.nombreUsuario
 WHERE l.estado = 'A';
 
---Mal, nunca usas un join no es una cosulta necesaria 
---Vista del lugar del evento
-CREATE VIEW Vista_Lugar_Evento AS
-SELECT e.asisten, e.fecha_inicio, e.fecha_finalizacion, e.proposito, e.nombre, e.id_localizacion, l.latitud, l.longitud
-FROM Evento e
-INNER JOIN Localizacion l ON e.id_localizacion = l.id_localizacion;
 
 --Bien
 --Vista de los planes para el usuario
@@ -1077,17 +934,16 @@ FROM Intercambio i
 INNER JOIN Usuario u1 ON i.usuario1 = u1.nombreUsuario
 INNER JOIN Usuario u2 ON i.usuario2 = u2.nombreUsuario;
 
---Mira los componentes y ponle logica, lo puse de tal manera que sea secuencial las funciones
 
 
 
 /*XIndicesVistas*/
 DROP VIEW Vista_Libros_Disponibles;
-DROP VIEW Vista_Lugar_Evento;
 DROP VIEW Vista_Planes_usuario;
 DROP VIEW Vista_Libros_Localizacion;
 DROP VIEW Vista_eventos_localizacion;
 DROP VIEW intercambios_usuarios;
+
 
 
 
