@@ -38,6 +38,6 @@ Se definieron diferentes tipos de clases para modelar los objetos del dominio de
 El proyecto se planeó cuidadosamente, dividiendo las tareas en etapas y asignando responsabilidades a los miembros del equipo. Se utilizaron metodologías ágiles para gestionar el desarrollo y garantizar la entrega oportuna de  las funcionalidades.
 ## Equipo
 
-- [Saray Alieth Mendivelso](https://github.com/usuario1)
-- [Sebastian Camargo](https://github.com/usuario2)
+- [Saray Alieth Mendivelso](https://github.com/saraygonm)
+- [Sebastian Camargo](https://github.com/SebSanUwU)
 
